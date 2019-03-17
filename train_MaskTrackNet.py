@@ -23,7 +23,7 @@ def train_MaskTrackNet():
     
     # Paths
     cfg = configparser.ConfigParser()
-    cfg.read('paths.conf')
+    cfg.read('settings.conf')
 
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch FCNResNet Training')
@@ -43,6 +43,7 @@ def train_MaskTrackNet():
 
     print('Args:', args)
 
+    # Device
     device = torch.device('cpu')
     if torch.cuda.is_available():
         device = torch.device('cuda')
@@ -62,11 +63,11 @@ def train_MaskTrackNet():
     dataset = WaterDataset(
         mode='train',
         dataset_path=cfg['path']['training_dataset_path'],
-        input_transforms=transforms.Compose([
+        img_transforms=transforms.Compose([
             transforms.ToTensor(),
             imagenet_normalize
         ]),
-        target_transforms=transforms.Compose([
+        label_transforms=transforms.Compose([
             transforms.ToTensor()
         ])
     )
@@ -78,7 +79,8 @@ def train_MaskTrackNet():
     )
 
     # Model
-    mt_net = MaskTrackNet().to(device)
+    mt_net = MaskTrackNet()
+    mt_net.to(device)
 
     # Criterion and Optimizor
     criterion = torch.nn.BCEWithLogitsLoss().to(device)
@@ -105,13 +107,12 @@ def train_MaskTrackNet():
     else:
         print('Load pretrained ResNet 34.')
         # resnet32_url = 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'
-        print(mt_net)
         pretrained_model = torch.load(os.path.join(cfg['path']['models_path'], 'resnet34-333f7ec4.pth'))
-        print(pretrained_model)
         mt_net.load_pretrained_model(pretrained_model)
 
     # Start training
     mt_net.train()
+
     epoch_endtime = time.time()
     if not os.path.exists(cfg['path']['models_path']):
         os.mkdir(cfg['path']['models_path'])
@@ -126,17 +127,22 @@ def train_MaskTrackNet():
 
         adjust_learning_rate(optimizer, args.lr, epoch)   
 
-        for i, (input, target) in enumerate(train_loader):
+        for i, (img, label) in enumerate(train_loader):
             
-            input, target = input.to(device), target.to(device)
+            img, label = img.to(device), label.to(device)
+            img_mask = torch.cat([img, label], 1)
+            output = mt_net(img_mask)
 
-            output = mt_net(input)
+            # print('before', mt_net.state_dict()['deconv1.0.weight'][0])
 
-            loss = criterion(output, target)
+            loss = criterion(output, label)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
+            # print(loss.requires_grad)
+            # print('after', mt_net.state_dict()['deconv1.0.weight'][0])
+            # break
             losses.update(loss.item())
 
             if i % 100 == 0:
@@ -144,7 +150,7 @@ def train_MaskTrackNet():
                 batch_time.update(time.time() - batch_endtime)
                 batch_endtime = time.time()
 
-                print('Epoch: [{0}/{1} | {2}/{3}]\t'
+                print('Epoch: [{0:4}/{1} | {2:4}/{3}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.sum:.3f})\t'
                       'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
                       epoch, args.total_epochs, i, len(train_loader),

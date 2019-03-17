@@ -124,7 +124,7 @@ class MaskTrackNet(nn.Module):
         own_state = self.state_dict()
         for name, param in pretrained_model.items():
             if name in own_state:
-                if name is 'conv1.weight':
+                if name == 'conv1.weight':
                     own_state[name][:,1:,:,:].copy_(param.data)
                 else:
                     own_state[name].copy_(param.data)
