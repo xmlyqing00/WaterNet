@@ -171,7 +171,7 @@ def train_MaskTrackNet():
 
         print('Epoch: [{0}/{1}]\t'
               'Time {epoch_time.val:.3f} ({epoch_time.sum:.3f})\t'
-              'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
+              'Avg loss {loss.avg:.4f}'.format(
               epoch, args.total_epochs, 
               epoch_time=epoch_time, loss=losses))
         
