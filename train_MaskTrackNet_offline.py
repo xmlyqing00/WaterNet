@@ -26,7 +26,7 @@ def train_MaskTrackNet():
     cfg.read('settings.conf')
 
     # Hyper parameters
-    parser = argparse.ArgumentParser(description='PyTorch FCNResNet Training')
+    parser = argparse.ArgumentParser(description='PyTorch MaskTrackNet Training')
     parser.add_argument(
         '--start-epoch', default=0, type=int, metavar='N',
         help='Manual epoch number (useful on restarts, default 0).')
@@ -62,7 +62,7 @@ def train_MaskTrackNet():
     )
     dataset = WaterDataset(
         mode='train',
-        dataset_path=cfg['path']['training_dataset_path'],
+        dataset_path=cfg['path']['dataset_path'],
         img_transforms=transforms.Compose([
             transforms.ToTensor(),
             imagenet_normalize
@@ -73,7 +73,7 @@ def train_MaskTrackNet():
     )
     train_loader = torch.utils.data.DataLoader(
         dataset=dataset,
-        batch_size=1,
+        batch_size=int(cfg['params']['batch_size']),
         shuffle=True,
         **dataset_args
     )
@@ -119,6 +119,9 @@ def train_MaskTrackNet():
 
     epoch_time = AverageMeter()
 
+    # Without previous mask
+    blank_mask = torch.zeros(int(cfg['params']['batch_size']), 1, 300, 300)
+
     for epoch in range(args.start_epoch, args.total_epochs):
         
         losses = AverageMeter()
@@ -130,7 +133,8 @@ def train_MaskTrackNet():
         for i, (img, label) in enumerate(train_loader):
             
             img, label = img.to(device), label.to(device)
-            img_mask = torch.cat([img, label], 1)
+            # img_mask = torch.cat([img, label], 1)
+            
             output = mt_net(img_mask)
 
             # print('before', mt_net.state_dict()['deconv1.0.weight'][0])
