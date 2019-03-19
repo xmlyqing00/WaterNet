@@ -56,20 +56,9 @@ def train_MaskTrackNet():
             'pin_memory': True
         }
 
-    imagenet_normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]
-    )
     dataset = WaterDataset(
-        mode='train',
+        mode='train_offline',
         dataset_path=cfg['path']['dataset_path'],
-        img_transforms=transforms.Compose([
-            transforms.ToTensor(),
-            imagenet_normalize
-        ]),
-        label_transforms=transforms.Compose([
-            transforms.ToTensor()
-        ])
     )
     train_loader = torch.utils.data.DataLoader(
         dataset=dataset,
@@ -120,7 +109,7 @@ def train_MaskTrackNet():
     epoch_time = AverageMeter()
 
     # Without previous mask
-    blank_mask = torch.zeros(int(cfg['params']['batch_size']), 1, 300, 300)
+    # blank_mask = torch.zeros(int(cfg['params']['batch_size']), 1, 300, 300)
 
     for epoch in range(args.start_epoch, args.total_epochs):
         
@@ -130,7 +119,7 @@ def train_MaskTrackNet():
 
         adjust_learning_rate(optimizer, args.lr, epoch)   
 
-        for i, (img, label) in enumerate(train_loader):
+        for i, sample in enumerate(train_loader):
             
             img, label = img.to(device), label.to(device)
             # img_mask = torch.cat([img, label], 1)
