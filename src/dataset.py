@@ -43,7 +43,7 @@ class WaterDataset(data.Dataset):
             first_frame_path = os.path.join(dataset_path, 'imgs/', test_case, label_list[0])
 
             self.first_frame_label = cv2.imread(first_frame_label_path)
-            self.first_frame_img = cv2.imread(first_frame_img_path)
+            self.first_frame = cv2.imread(first_frame_path)
 
         elif mode == 'eval':
             if test_case is None:
@@ -72,7 +72,7 @@ class WaterDataset(data.Dataset):
             return sample
 
         elif self.mode == 'train_online':
-            sample = self.apply_transforms(self.first_frame_img, self.first_frame_label, self.first_frame_label)
+            sample = self.apply_transforms(self.first_frame, self.first_frame_label, self.first_frame_label)
             return sample
 
         elif self.mode == 'eval':
