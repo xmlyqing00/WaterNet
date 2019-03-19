@@ -66,6 +66,7 @@ def random_mask_perturbation(mask):
 
 def random_resized_crop(img, mask, label, size):
     
+    x = random.uniform(0, )
     return img, mask, label
 
 def imagenet_normalization(img_tensor):
