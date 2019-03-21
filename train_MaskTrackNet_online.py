@@ -19,7 +19,7 @@ def adjust_learning_rate(optimizer, start_lr, epoch):
         param_group['lr'] = lr
 
 
-def train_MaskTrackNet_offline():
+def train_MaskTrackNet_online():
     
     # Paths
     cfg = configparser.ConfigParser()
@@ -58,7 +58,7 @@ def train_MaskTrackNet_offline():
 
     dataset = WaterDataset(
         mode='train_offline',
-        dataset_path=cfg['paths']['dataset'],
+        dataset_path=cfg['path']['dataset_path'],
         input_size=(int(cfg['params']['input_w']), int(cfg['params']['input_h']))
     )
     train_loader = torch.utils.data.DataLoader(
@@ -69,7 +69,8 @@ def train_MaskTrackNet_offline():
     )
 
     # Model
-    mt_net = MaskTrackNet().to(device)
+    mt_net = MaskTrackNet()
+    mt_net.to(device)
 
     # Criterion and Optimizor
     criterion = torch.nn.BCEWithLogitsLoss().to(device)
@@ -96,15 +97,15 @@ def train_MaskTrackNet_offline():
     else:
         print('Load pretrained ResNet 34.')
         # resnet32_url = 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'
-        pretrained_model = torch.load(os.path.join(cfg['paths']['models'], 'resnet34-333f7ec4.pth'))
+        pretrained_model = torch.load(os.path.join(cfg['path']['models_path'], 'resnet34-333f7ec4.pth'))
         mt_net.load_pretrained_model(pretrained_model)
 
     # Start training
     mt_net.train()
 
     epoch_endtime = time.time()
-    if not os.path.exists(cfg['paths']['models']):
-        os.mkdir(cfg['paths']['models'])
+    if not os.path.exists(cfg['path']['models_path']):
+        os.mkdir(cfg['path']['models_path'])
 
     epoch_time = AverageMeter()
 
@@ -118,12 +119,6 @@ def train_MaskTrackNet_offline():
         batch_endtime = time.time()
 
         adjust_learning_rate(optimizer, args.lr, epoch)   
-        lr = -1
-        for param_group in optimizer.param_groups:
-            lr = param_group['lr']
-        print('\n====== Epoch: [{0:4}/{1:4}]\tlr: {2:.6f} ======'.format(
-            epoch, args.total_epochs, lr
-        ))
 
         for i, sample in enumerate(train_loader):
                         
@@ -140,23 +135,19 @@ def train_MaskTrackNet_offline():
 
             losses.update(loss.item())
 
-            if i % 10 == 0 or i + 1 == len(train_loader):
+            if i % 10 == 0 or i == args.total_epochs - 1:
 
                 batch_time.update(time.time() - batch_endtime)
                 batch_endtime = time.time()
 
-                print('Batch: [{0:4}/{1:4}]\t'
-                      'Time: {batch_time.val:.3f}s ({batch_time.sum:.3f}s)\t'
-                      'Loss: {loss.val:.4f} ({loss.avg:.4f})'.format(
-                      i, len(train_loader), 
+                print('Epoch: [{0:4}/{1} | {2:4}/{3}]\t'
+                      'Time {batch_time.val:.3f} ({batch_time.sum:.3f})\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
+                      epoch, args.total_epochs, i, len(train_loader),
                       batch_time=batch_time, loss=losses))
 
         epoch_time.update(time.time() - epoch_endtime)
         epoch_endtime = time.time()
-
-        print('Time: {epoch_time.val:.3f}s ({epoch_time.sum:.3f}s)\t'
-              'Avg loss: {loss.avg:.4f}'.format(
-              epoch_time=epoch_time, loss=losses))
 
         torch.save(
             obj={
@@ -165,12 +156,17 @@ def train_MaskTrackNet_offline():
                 'optimizer': optimizer.state_dict(),
                 'loss': losses.avg,
             },
-            f=os.path.join(cfg['paths']['models'], 'checkpoint_{0}.pth.tar'.format(epoch))
+            f=os.path.join(cfg['path']['models_path'], 'checkpoint_{0}.pth.tar'.format(epoch))
         )
+
+        print('Epoch: [{0}/{1}]\t'
+              'Time {epoch_time.val:.3f} ({epoch_time.sum:.3f})\t'
+              'Avg loss {loss.avg:.4f}'.format(
+              epoch, args.total_epochs, 
+              epoch_time=epoch_time, loss=losses))
         
         print('Model saved.')
-        
 
 
 if __name__ == '__main__':
-    train_MaskTrackNet_offline()
+    train_MaskTrackNet_online()

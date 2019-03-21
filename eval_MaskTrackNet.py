@@ -13,7 +13,7 @@ from src.dataset import WaterDataset
 from src.avg_meter import AverageMeter
 
 
-def test_FCNResNet():
+def eval_MaskTrackNet():
     
     # Paths
     cfg = configparser.ConfigParser()
@@ -28,7 +28,7 @@ def test_FCNResNet():
         '-i', '--video-name', default=None, type=str,
         help='Test video name (default: none).')
     parser.add_argument(
-        '-o', '--out-path', default=None, type=str, metavar='PATH',
+        '-o', '--out-path', default=os.path.join(cfg['paths']['dataset'], 'MaskTrackNet_segs/'), type=str, metavar='PATH',
         help='Path to the output segmentations (default: none).')
     args = parser.parse_args()
 
@@ -36,10 +36,8 @@ def test_FCNResNet():
 
     if args.checkpoint is None:
         raise ValueError('Must input checkpoint path.')
-    if args.imgs_path is None:
-        raise ValueError('Must input test images path.')
-    if args.out_path is None:
-        raise ValueError('Must input output images path.')
+    if args.video_name is None:
+        raise ValueError('Must input video name.')
 
     water_thres = 5
 
@@ -51,21 +49,14 @@ def test_FCNResNet():
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': 4,
-            'pin_memory': True
+            'num_workers': int(cfg['params']['num_workers']),
+            'pin_memory': bool(cfg['params']['pin_memory'])
         }
 
-    imagenet_normalize = transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]
-    )
     dataset = WaterDataset(
-        mode='test',
+        mode='eval',
         dataset_path=cfg['path']['dataset_path'], 
-        img_transforms=transforms.Compose([
-            transforms.ToTensor(),
-            imagenet_normalize
-        ])
+        test_case=args.video_name
     )
     test_loader = torch.utils.data.DataLoader(
         dataset=dataset,
@@ -88,18 +79,22 @@ def test_FCNResNet():
     else:
         raise ValueError('No checkpoint found at \'{}\''.format(args.checkpoint))
 
+    # Set ouput path
+    out_path = os.path.join(args.out_path, args.video_name)
+    if not os.path.exists(out_path):
+        os.mkdir(out_path)
+
     # Start testing
-    
     mt_net.eval()
 
-    if not os.path.exists(args.out_path):
-        os.mkdir(args.out_path)
+    # First frame annotation
+    first_frame_label = dataset.get_first_frame_label()
 
-    for i, input in enumerate(test_loader):
+    for i, sample in enumerate(test_loader):
         
-        print(i)
+        print('Segment: [{0:4}/{1:4}'.format(i, len(test_loader)))
 
-        input = input.to(device)
+        img = sample['img'].to(device)        
         output = mt_net(input)
 
         seg = output.cpu().detach().numpy().squeeze(0).transpose((1, 2, 0))

@@ -11,11 +11,14 @@ import src.transforms as my_tf
 
 class WaterDataset(data.Dataset):
 
-    def __init__(self, mode, dataset_path, test_case=None):
+    def __init__(self, mode, dataset_path, input_size=None, test_case=None):
         
         self.mode = mode
+        self.input_size = input_size
+        self.test_case = test_case
         self.img_list = []
         self.label_list = []
+        self.verbose_flag = False
         
         if mode == 'train_offline':
             water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2']
@@ -66,8 +69,8 @@ class WaterDataset(data.Dataset):
         if self.mode == 'train_offline':
             
             img = Image.open(self.img_list[index])
-            label = Image.open(self.label_list[index], 0)
-            label = np.expand_dims(label, 2)
+            label = Image.open(self.label_list[index]).convert('L')
+            
             sample = self.apply_transforms(img, label, label)
             return sample
 
@@ -87,21 +90,41 @@ class WaterDataset(data.Dataset):
         return self.first_frame_label
 
     def apply_transforms(self, img, mask=None, label=None):
-        
+
         if self.mode == 'train_offline':
             
-            img = my_tf.random_adjust_color(img)
-            img, mask, label = my_tf.random_affine_transformation(img, mask, label)
-            mask = my_tf.random_mask_perturbation(mask)
+            # img.save('tmp/ori_img.png')
+            # mask.save('tmp/ori_mask.png')
+            # label.save('tmp/ori_label.png')
             
+            img = my_tf.random_adjust_color(img, self.verbose_flag)
+            # img.save('tmp/color_img.png')
+
+            img, mask, label = my_tf.random_affine_transformation(img, mask, label, self.verbose_flag)
+
+            # img.save('tmp/affine_img.png')
+            # mask.save('tmp/affine_mask.png')
+            # label.save('tmp/affine_label.png')
+
+            mask = my_tf.random_mask_perturbation(mask, self.verbose_flag)
+
+            # mask.save('tmp/pertur_mask.png')
+            img, mask, label = my_tf.random_resized_crop(img, mask, label, self.input_size, self.verbose_flag)
+
+            # img.save('tmp/crop_img.png')
+            # mask.save('tmp/crop_mask.png')
+            # label.save('tmp/crop_label.png')
+
             mask = TF.to_tensor(mask)
             label = TF.to_tensor(label)
+
 
         elif self.mode == 'train_online':
             
             img = my_tf.random_adjust_color(img)
             img, mask, label = my_tf.random_affine_transformation(img, mask, label)
             mask = my_tf.random_mask_perturbation(mask)
+            img, mask, label = my_tf.random_resized_crop(img, mask, label, self.input_size)
 
             mask = TF.to_tensor(mask)
             label = TF.to_tensor(label)
