@@ -87,7 +87,7 @@ class WaterDataset(data.Dataset):
         return len(self.img_list)
 
     def get_first_frame_label(self):
-        return self.first_frame_label
+        return TF.to_tensor(self.first_frame_label)
 
     def apply_transforms(self, img, mask=None, label=None):
 

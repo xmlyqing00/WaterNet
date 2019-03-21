@@ -5,8 +5,8 @@ import time
 import cv2
 import torch
 import configparser
-from torch.utils import model_zoo
-from torchvision import transforms
+import torchvision.transforms.functional as TF
+from PIL import Image
 
 from src.network import MaskTrackNet
 from src.dataset import WaterDataset
@@ -88,21 +88,22 @@ def eval_MaskTrackNet():
     mt_net.eval()
 
     # First frame annotation
-    first_frame_label = dataset.get_first_frame_label()
+    pre_frame_mask = dataset.get_first_frame_label()
+    first_frame_seg = TF.to_pil_image(pre_frame_mask)
+    first_frame_seg.save(os.path.join(out_path, '0.png'))
+    pre_frame_mask = pre_frame_mask.to(device)
 
     for i, sample in enumerate(test_loader):
         
         print('Segment: [{0:4}/{1:4}'.format(i, len(test_loader)))
 
-        img = sample['img'].to(device)        
-        output = mt_net(input)
+        img = sample['img'].to(device)     
+        img_mask = torch.cat([img, pre_frame_mask], 1)  
+        output = mt_net(img_mask)
 
-        seg = output.cpu().detach().numpy().squeeze(0).transpose((1, 2, 0))
-        ret, seg = cv2.threshold(seg, water_thres, 255, cv2.THRESH_BINARY)
-
-        seg_path = os.path.join(args.out_path, str(i) + '.png')
-        cv2.imwrite(seg_path, seg)
+        seg = TF.to_pil_image(output.cpu())
+        seg.save(os.path.join(seg_path, '%d.png' % i))
 
 
 if __name__ == '__main__':
-    test_FCNResNet()
+    eval_MaskTrackNet()

@@ -4,8 +4,6 @@ import sys
 import time
 import configparser
 import torch
-from torch.utils import model_zoo
-from torchvision import transforms
 
 from src.network import MaskTrackNet
 from src.dataset import WaterDataset
