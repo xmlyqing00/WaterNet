@@ -51,7 +51,7 @@ def eval_MaskTrackNet():
     if args.video_name is None:
         raise ValueError('Must input video name.')
 
-    water_thres = 0.6
+    water_thres = 0.8
 
     device = torch.device('cpu')
     if torch.cuda.is_available():

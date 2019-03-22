@@ -4,12 +4,11 @@ import random
 import copy
 import numpy as np
 import torchvision.transforms.functional as TF
-from PIL import Image, ImageFile
+from PIL import Image
 from torch.utils import data
 
+from src.utils import load_image_in_PIL
 import src.transforms as my_tf
-
-ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class WaterDataset(data.Dataset):
@@ -57,11 +56,14 @@ class WaterDataset(data.Dataset):
                 first_frame_label_path += 'jpg'
 
             # print(first_frame_path, first_frame_label_path)
-            self.first_frame = Image.open(first_frame_path)
-            self.first_frame_label = Image.open(first_frame_label_path).convert('L')
+
+            self.first_frame = load_image_in_PIL(first_frame_path)
+            self.first_frame_label = load_image_in_PIL(first_frame_label_path).convert('L')
+
             # print(self.first_frame)
             # print(self.first_frame_label)
             # x = self.first_frame.copy()
+            # self.first_frame.save('tmp/first_frame_-1.png')
 
         elif mode == 'eval':
             if test_case is None:
@@ -82,7 +84,7 @@ class WaterDataset(data.Dataset):
                 first_frame_label_path += 'jpg'
 
             self.img_list.pop(0)
-            self.first_frame_label = Image.open(first_frame_label_path).convert('L')
+            self.first_frame_label = load_image_in_PIL(first_frame_label_path).convert('L')
 
         else:
             raise('Mode %s does not support in [train_offline, train_online, eval].' % mode)
@@ -90,8 +92,8 @@ class WaterDataset(data.Dataset):
     def __getitem__(self, index):
         
         if self.mode == 'train_offline':
-            img = Image.open(self.img_list[index])
-            label = Image.open(self.label_list[index]).convert('L')
+            img = load_image_in_PIL(self.img_list[index])
+            label = load_image_in_PIL(self.label_list[index]).convert('L')
             
             sample = self.apply_transforms(img, label, label)
             return sample
@@ -101,7 +103,7 @@ class WaterDataset(data.Dataset):
             return sample
 
         elif self.mode == 'eval':
-            img = Image.open(self.img_list[index])
+            img = load_image_in_PIL(self.img_list[index])
             sample = self.apply_transforms(img)
             return sample
     
@@ -142,14 +144,16 @@ class WaterDataset(data.Dataset):
 
         elif self.mode == 'train_online':
             
+            # img.save('tmp/img_ori.png')
+
             img = my_tf.random_adjust_color(img, self.verbose_flag)
             img, mask, label = my_tf.random_affine_transformation(img, mask, label, self.verbose_flag)
             mask = my_tf.random_mask_perturbation(mask, self.verbose_flag)
             img, mask, label = my_tf.random_resized_crop(img, mask, label, self.input_size, self.verbose_flag)
 
-            # img.save('tmp/crop_img.png')
-            # mask.save('tmp/crop_mask.png')
-            # label.save('tmp/crop_label.png')
+            # img.save('tmp/img_crop.png')
+            # mask.save('tmp/mask_crop.png')
+            # label.save('tmp/label_crop.png')
 
         elif self.mode == 'eval':
             pass
@@ -173,5 +177,3 @@ class WaterDataset(data.Dataset):
             }
 
         return sample
-
-    
