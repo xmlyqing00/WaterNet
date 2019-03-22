@@ -162,7 +162,7 @@ def train_MaskTrackNet_online():
                 'optimizer': optimizer.state_dict(),
                 'loss': losses.avg,
             },
-            f=os.path.join(cfg['paths']['models'], 'checkpoint_online_{0}.pth.tar'.format(epoch))
+            f=os.path.join(cfg['paths']['models'], 'checkpoint_{0}_{1}.pth.tar'.format(args.video_name, epoch))
         )
         
         print('Online model saved.')

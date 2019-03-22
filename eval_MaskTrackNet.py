@@ -37,7 +37,7 @@ def eval_MaskTrackNet():
         '-i', '--video-name', default=None, type=str,
         help='Test video name (default: none).')
     parser.add_argument(
-        '-i', '--model-name', default='MaskTrackNet_segs', type=str,
+        '-m', '--model-name', default='MaskTrackNet_segs', type=str,
         help='Model name for the ouput segmentation, it will create a subfolder under the out_folder (default: none).')
     parser.add_argument(
         '-o', '--out-folder', default=cfg['paths']['dataset'], type=str, metavar='PATH',
