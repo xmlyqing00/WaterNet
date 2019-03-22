@@ -26,9 +26,6 @@ def train_MaskTrackNet_offline():
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch MaskTrackNet Training')
     parser.add_argument(
-        '--start-epoch', default=0, type=int, metavar='N',
-        help='Manual epoch number (useful on restarts, default 0).')
-    parser.add_argument(
         '--total-epochs', default=int(cfg['params']['total_epochs']), type=int, metavar='N',
         help='Number of total epochs to run (default 100).')
     parser.add_argument(
@@ -120,7 +117,7 @@ def train_MaskTrackNet_offline():
         for param_group in optimizer.param_groups:
             lr = param_group['lr']
         print('\n====== Epoch: [{0:4}/{1:4}]\tlr: {2:.6f} ======'.format(
-            epoch, args.total_epochs, lr
+            epoch + 1, args.total_epochs, lr
         ))
 
         for i, sample in enumerate(train_loader):
@@ -138,7 +135,7 @@ def train_MaskTrackNet_offline():
 
             losses.update(loss.item())
 
-            if i % 10 == 0 or i + 1 == len(train_loader):
+            if (i + 1) % 10 == 0 or i + 1 == len(train_loader):
 
                 batch_time.update(time.time() - batch_endtime)
                 batch_endtime = time.time()
@@ -146,7 +143,7 @@ def train_MaskTrackNet_offline():
                 print('Batch: [{0:4}/{1:4}]\t'
                       'Time: {batch_time.val:.3f}s ({batch_time.sum:.3f}s)\t'
                       'Loss: {loss.val:.4f} ({loss.avg:.4f})'.format(
-                      i, len(train_loader), 
+                      i + 1, len(train_loader), 
                       batch_time=batch_time, loss=losses))
 
         epoch_time.update(time.time() - epoch_endtime)
@@ -166,7 +163,7 @@ def train_MaskTrackNet_offline():
             f=os.path.join(cfg['paths']['models'], 'checkpoint_{0}.pth.tar'.format(epoch))
         )
         
-        print('Model saved.')
+        print('Offline model saved.')
         
 
 

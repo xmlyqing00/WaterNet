@@ -1,12 +1,15 @@
 import os
 import sys
 import random
+import copy
 import numpy as np
 import torchvision.transforms.functional as TF
-from PIL import Image
+from PIL import Image, ImageFile
 from torch.utils import data
 
 import src.transforms as my_tf
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 class WaterDataset(data.Dataset):
@@ -19,6 +22,7 @@ class WaterDataset(data.Dataset):
         self.img_list = []
         self.label_list = []
         self.verbose_flag = False
+        self.online_augmentation_per_epoch = 6400
         
         if mode == 'train_offline':
             water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2']
@@ -38,28 +42,47 @@ class WaterDataset(data.Dataset):
             if test_case is None:
                 raise('test_case can not be None.')
 
-            label_path = os.path.join(dataset_path, 'labels/', test_case)
-            label_list = os.listdir(label_path)
-            label_list.sort(key = lambda x: (len(x), x))
+            img_path = os.path.join(dataset_path, 'test_videos/', test_case)
+            img_list = os.listdir(img_path)
+            img_list.sort(key = lambda x: (len(x), x))
 
-            first_frame_label_path = os.path.join(dataset_path, 'labels/', test_case, label_list[0])
-            first_frame_path = os.path.join(dataset_path, 'imgs/', test_case, label_list[0])
+            first_frame_path = os.path.join(dataset_path, 'test_videos/', test_case, img_list[0])
+            first_frame_label_path = os.path.join(dataset_path, 'test_annots/', test_case, img_list[0])
 
-            self.first_frame_label = Image.open(first_frame_label_path)
+            # Detect label image format: png or jpg
+            first_frame_label_path = first_frame_label_path[:-3]
+            if os.path.exists(first_frame_label_path + 'png'):
+                first_frame_label_path += 'png'
+            else:
+                first_frame_label_path += 'jpg'
+
+            # print(first_frame_path, first_frame_label_path)
             self.first_frame = Image.open(first_frame_path)
+            self.first_frame_label = Image.open(first_frame_label_path).convert('L')
+            # print(self.first_frame)
+            # print(self.first_frame_label)
+            # x = self.first_frame.copy()
 
         elif mode == 'eval':
             if test_case is None:
                 raise('test_case can not be None.')
             
-            img_path = os.path.join(dataset_path, 'imgs/', test_case)
+            img_path = os.path.join(dataset_path, 'test_videos/', test_case)
             img_list = os.listdir(img_path)
             img_list.sort(key = lambda x: (len(x), x))
             self.img_list = [os.path.join(img_path, name) for name in img_list]
 
-            first_frame_label_path = os.path.join(dataset_path, 'labels/', test_case, img_list[0])
+            first_frame_label_path = os.path.join(dataset_path, 'test_annots/', test_case, img_list[0])
+
+            # Detect label image format: png or jpg
+            first_frame_label_path = first_frame_label_path[:-3]
+            if os.path.exists(first_frame_label_path + 'png'):
+                first_frame_label_path += 'png'
+            else:
+                first_frame_label_path += 'jpg'
+
             self.img_list.pop(0)
-            self.first_frame_label = Image.open(first_frame_label_path)
+            self.first_frame_label = Image.open(first_frame_label_path).convert('L')
 
         else:
             raise('Mode %s does not support in [train_offline, train_online, eval].' % mode)
@@ -67,7 +90,6 @@ class WaterDataset(data.Dataset):
     def __getitem__(self, index):
         
         if self.mode == 'train_offline':
-            
             img = Image.open(self.img_list[index])
             label = Image.open(self.label_list[index]).convert('L')
             
@@ -84,7 +106,10 @@ class WaterDataset(data.Dataset):
             return sample
     
     def __len__(self):
-        return len(self.img_list)
+        if self.mode == 'train_online':
+            return self.online_augmentation_per_epoch
+        else:
+            return len(self.img_list)
 
     def get_first_frame_label(self):
         return TF.to_tensor(self.first_frame_label)
@@ -115,19 +140,16 @@ class WaterDataset(data.Dataset):
             # mask.save('tmp/crop_mask.png')
             # label.save('tmp/crop_label.png')
 
-            mask = TF.to_tensor(mask)
-            label = TF.to_tensor(label)
-
-
         elif self.mode == 'train_online':
             
-            img = my_tf.random_adjust_color(img)
-            img, mask, label = my_tf.random_affine_transformation(img, mask, label)
-            mask = my_tf.random_mask_perturbation(mask)
-            img, mask, label = my_tf.random_resized_crop(img, mask, label, self.input_size)
+            img = my_tf.random_adjust_color(img, self.verbose_flag)
+            img, mask, label = my_tf.random_affine_transformation(img, mask, label, self.verbose_flag)
+            mask = my_tf.random_mask_perturbation(mask, self.verbose_flag)
+            img, mask, label = my_tf.random_resized_crop(img, mask, label, self.input_size, self.verbose_flag)
 
-            mask = TF.to_tensor(mask)
-            label = TF.to_tensor(label)
+            # img.save('tmp/crop_img.png')
+            # mask.save('tmp/crop_mask.png')
+            # label.save('tmp/crop_label.png')
 
         elif self.mode == 'eval':
             pass
@@ -135,11 +157,20 @@ class WaterDataset(data.Dataset):
         img = TF.to_tensor(img)
         img = my_tf.imagenet_normalization(img)
 
-        sample = {
-            'img': img,
-            'mask': mask,
-            'label': label
-        }
+        if self.mode == 'train_offline' or self.mode == 'train_online':
+
+            mask = TF.to_tensor(mask)
+            label = TF.to_tensor(label)
+
+            sample = {
+                'img': img,
+                'mask': mask,
+                'label': label
+            }
+        else:
+            sample = {
+                'img': img
+            }
 
         return sample
 
