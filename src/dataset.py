@@ -21,7 +21,7 @@ class WaterDataset(data.Dataset):
         self.img_list = []
         self.label_list = []
         self.verbose_flag = False
-        self.online_augmentation_per_epoch = 640
+        self.online_augmentation_per_epoch = 6400
         
         if mode == 'train_offline':
             water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2']
@@ -83,7 +83,7 @@ class WaterDataset(data.Dataset):
             else:
                 first_frame_label_path += 'jpg'
 
-            self.img_list.pop(0)
+            # self.img_list.pop(0)
             self.first_frame_label = load_image_in_PIL(first_frame_label_path).convert('L')
 
         else:

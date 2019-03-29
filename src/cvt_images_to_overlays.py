@@ -55,7 +55,7 @@ def cvt_images_to_overlays(image_folder,
     mask_list.sort(key = lambda x: (len(x), x))
 
     stride = max(0, int(stride))
-    for image_idx in range(0, len(mask_list), stride):
+    for image_idx in range(0, len(image_list), stride):
         
         image_path = os.path.join(image_folder, image_list[image_idx+frame_st])
         image = cv2.imread(image_path)
@@ -72,15 +72,16 @@ def cvt_images_to_overlays(image_folder,
         output_path = os.path.join(output_folder, output_name)
         cv2.imwrite(output_path, image_mask)
 
-        print("Add mask to image", output_path)
+        print("Add mask to image:", image_idx, output_path)
 
 
 def run_cvt_images_to_overlays():
     root_folder = '/Ship01/Dataset/water/collection/'
-    test_name = 'boston_harbor2'
+    test_name = 'boston_harbor1'
+    model_name = 'MaskTrackNet_new_segs2/'
     image_folder = os.path.join(root_folder, 'test_videos/', test_name)
-    mask_folder = os.path.join(root_folder, 'MaskTrackNet_segs/', test_name)
-    output_folder = os.path.join(root_folder, 'overlays/MaskTrackNet_segs', test_name)
+    mask_folder = os.path.join(root_folder, model_name, test_name)
+    output_folder = os.path.join(root_folder, 'overlays/', model_name, test_name)
     label_color = (255, 255, 255)
     stride = 1
     frame_st = 0

@@ -152,8 +152,8 @@ def train_MaskTrackNet_online():
         epoch_endtime = time.time()
 
         print('Time: {epoch_time.val:.3f}s ({epoch_time.sum:.3f}s)\t'
-              'Avg loss: {loss.avg:.4f}'.format(
-              epoch_time=epoch_time, loss=losses))
+            'Avg loss: {loss.avg:.4f}'.format(
+            epoch_time=epoch_time, loss=losses))
 
         torch.save(
             obj={

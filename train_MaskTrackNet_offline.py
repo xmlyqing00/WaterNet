@@ -77,11 +77,12 @@ def train_MaskTrackNet_offline():
     )
 
     # Load pretrained model
+    start_epoch = 0
     if args.resume:
         if os.path.isfile(args.resume):
             print('Load checkpoint \'{}\''.format(args.resume))
             checkpoint = torch.load(args.resume)
-            args.start_epoch = checkpoint['epoch'] + 1
+            start_epoch = checkpoint['epoch'] + 1
             mt_net.load_state_dict(checkpoint['model'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             print('Loaded checkpoint \'{}\' (epoch {})'
@@ -106,7 +107,7 @@ def train_MaskTrackNet_offline():
     # Without previous mask
     # blank_mask = torch.zeros(int(cfg['params']['batch_size']), 1, 300, 300)
 
-    for epoch in range(args.start_epoch, args.total_epochs):
+    for epoch in range(start_epoch, args.total_epochs):
         
         losses = AverageMeter()
         batch_time = AverageMeter()
@@ -135,7 +136,7 @@ def train_MaskTrackNet_offline():
 
             losses.update(loss.item())
 
-            if (i + 1) % 10 == 0 or i + 1 == len(train_loader):
+            if (i + 1) % 10 == 0 or (i + 1) == len(train_loader):
 
                 batch_time.update(time.time() - batch_endtime)
                 batch_endtime = time.time()
@@ -153,17 +154,18 @@ def train_MaskTrackNet_offline():
               'Avg loss: {loss.avg:.4f}'.format(
               epoch_time=epoch_time, loss=losses))
 
-        torch.save(
-            obj={
-                'epoch': epoch,
-                'model': mt_net.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'loss': losses.avg,
-            },
-            f=os.path.join(cfg['paths']['models'], 'checkpoint_{0}.pth.tar'.format(epoch))
-        )
-        
-        print('Offline model saved.')
+        if (epoch + 1) % 10 == 0 or (i + 1) == args.total_epochs:
+            torch.save(
+                obj={
+                    'epoch': epoch,
+                    'model': mt_net.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'loss': losses.avg,
+                },
+                f=os.path.join(cfg['paths']['models'], 'checkpoint_{0}.pth.tar'.format(epoch))
+            )
+            
+            print('Offline model saved.')
         
 
 
