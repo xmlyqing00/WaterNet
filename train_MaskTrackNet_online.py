@@ -7,7 +7,7 @@ import torch
 from torch.utils import model_zoo
 from torchvision import transforms
 
-from src.network import MaskTrackNet
+from src.network import MaskTrackNet_ResNet
 from src.dataset import WaterDataset
 from src.avg_meter import AverageMeter
 
@@ -73,7 +73,7 @@ def train_MaskTrackNet_online():
     )
 
     # Model
-    mt_net = MaskTrackNet().to(device)
+    mt_net = MaskTrackNet_ResNet().to(device)
 
     # Criterion and Optimizor
     criterion = torch.nn.BCEWithLogitsLoss().to(device)

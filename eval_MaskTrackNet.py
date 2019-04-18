@@ -8,7 +8,7 @@ import configparser
 import torchvision.transforms.functional as TF
 from PIL import Image
 
-from src.network import MaskTrackNet
+from src.network import MaskTrackNet_ResNet
 from src.dataset import WaterDataset
 from src.avg_meter import AverageMeter
 
@@ -29,7 +29,7 @@ def eval_MaskTrackNet():
     cfg.read('settings.conf')
 
     # Hyper parameters
-    parser = argparse.ArgumentParser(description='PyTorch MaskResNet Testing')
+    parser = argparse.ArgumentParser(description='PyTorch MaskTrackNet Testing')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
         help='Path to latest checkpoint (default: none).')
@@ -51,7 +51,7 @@ def eval_MaskTrackNet():
     if args.video_name is None:
         raise ValueError('Must input video name.')
 
-    water_thres = 0.5
+    water_thres = 0.6
 
     device = torch.device('cpu')
     if torch.cuda.is_available():
@@ -78,7 +78,7 @@ def eval_MaskTrackNet():
     )
 
     # Model
-    mt_net = MaskTrackNet().to(device)
+    mt_net = MaskTrackNet_ResNet().to(device)
 
     # Load pretrained model
     if os.path.isfile(args.checkpoint):

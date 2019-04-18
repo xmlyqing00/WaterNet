@@ -77,8 +77,8 @@ def cvt_images_to_overlays(image_folder,
 
 def run_cvt_images_to_overlays():
     root_folder = '/Ship01/Dataset/water/collection/'
-    test_name = 'boston_harbor1'
-    model_name = 'MaskTrackNet_new_segs2/'
+    test_name = 'schbeach'
+    model_name = 'MaskTrackNet_segs/'
     image_folder = os.path.join(root_folder, 'test_videos/', test_name)
     mask_folder = os.path.join(root_folder, model_name, test_name)
     output_folder = os.path.join(root_folder, 'overlays/', model_name, test_name)

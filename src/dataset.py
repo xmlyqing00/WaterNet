@@ -83,7 +83,7 @@ class WaterDataset(data.Dataset):
             else:
                 first_frame_label_path += 'jpg'
 
-            # self.img_list.pop(0)
+            self.img_list.pop(0)
             self.first_frame_label = load_image_in_PIL(first_frame_label_path).convert('L')
 
         else:

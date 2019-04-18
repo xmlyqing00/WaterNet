@@ -5,3 +5,4 @@ __pycache__/
 data/
 tmp/
 models/*.pth.tar
+models_backup/

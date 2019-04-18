@@ -3,11 +3,19 @@ from torch import nn
 from torch.autograd import Variable
 from torchvision.models.resnet import BasicBlock
 
-class MaskTrackNet(nn.Module):
+
+class MaskTrackNet_PureFeatureExtractor(nn.Module):
+    
+    def __init__(self):
+
+        super(MaskTrackNet_PureFeatureExtractor, self).__init__()
+        
+
+class MaskTrackNet_ResNet(nn.Module):
 
     def __init__(self):
         
-        super(MaskTrackNet, self).__init__()
+        super(MaskTrackNet_ResNet, self).__init__()
 
         # Resnet 34
         block = BasicBlock
@@ -133,7 +141,7 @@ class MaskTrackNet(nn.Module):
 
 if __name__ == '__main__':
 
-    mt_net = MaskTrackNet()
+    mt_net = MaskTrackNet_ResNet()
 
     input = Variable(torch.randn(1, 4, 200, 200))
     output = mt_net(input)
