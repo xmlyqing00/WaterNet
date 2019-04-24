@@ -3,6 +3,7 @@ import sys
 import random
 import copy
 import numpy as np
+import torch
 import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils import data
@@ -15,6 +16,8 @@ class WaterDataset(data.Dataset):
 
     def __init__(self, mode, dataset_path, input_size=None, test_case=None):
         
+        super(WaterDataset, self).__init__()
+
         self.mode = mode
         self.input_size = input_size
         self.test_case = test_case
@@ -89,6 +92,116 @@ class WaterDataset(data.Dataset):
         else:
             raise('Mode %s does not support in [train_offline, train_online, eval].' % mode)
 
+    def __len__(self):
+        if self.mode == 'train_online':
+            return self.online_augmentation_per_epoch
+        else:
+            return len(self.img_list)
+
+    def get_first_frame_label(self):
+        return TF.to_tensor(self.first_frame_label)
+
+    def __getitem__(self, index):
+        raise NotImplementedError
+
+
+class WaterDataset_PFD(WaterDataset):
+
+    def __init__(self, mode, dataset_path, input_size=None, test_case=None):
+
+        super(WaterDataset_PFD, self).__init__(mode, dataset_path, input_size, test_case)
+        self.class_n = 2
+        self.label_colors = [255, 0]
+
+        self.black_tensor1 = TF.to_tensor(np.zeros(input_size + [1], np.uint8))
+        self.black_tensor3 = TF.to_tensor(np.zeros(input_size + [3], np.uint8))
+
+    def __getitem__(self, index):
+
+        if self.mode == 'train_offline':
+            img = load_image_in_PIL(self.img_list[index])
+            label = load_image_in_PIL(self.label_list[index]).convert('L')
+
+            sample = self.apply_transforms(img, label)
+            return sample
+
+        elif self.mode == 'train_online':
+            sample = self.apply_transforms(self.first_frame, self.first_frame_label)
+            return sample
+
+        elif self.mode == 'eval':
+            img = load_image_in_PIL(self.img_list[index])
+            sample = self.apply_transforms(img)
+            return sample
+
+    def apply_transforms(self, img, label=None):
+        
+        if self.mode == 'train_offline':
+            
+            # img.save('tmp/ori_img.png')
+            # label.save('tmp/ori_label.png')
+            
+            img = my_tf.random_adjust_color(img, self.verbose_flag)
+            img, label = my_tf.random_affine_transformation(img, None, label, self.verbose_flag)
+
+            # img.save('tmp/affine_img.png')
+            # label.save('tmp/affine_label.png')
+
+            img, label = my_tf.random_resized_crop(img, None, label, self.input_size, self.verbose_flag)
+
+            # img.save('tmp/crop_img.png')
+            # label.save('tmp/crop_label.png')
+
+        elif self.mode == 'train_online':
+            
+            # img.save('tmp/img_ori.png')
+
+            img = my_tf.random_adjust_color(img, self.verbose_flag)
+            img, label = my_tf.random_affine_transformation(img, None, label, self.verbose_flag)
+            img, label = my_tf.random_resized_crop(img, None, label, self.input_size, self.verbose_flag)
+
+            # img.save('tmp/img_crop.png')
+            # mask.save('tmp/mask_crop.png')
+            # label.save('tmp/label_crop.png')
+
+        elif self.mode == 'eval':
+            pass
+
+        img = TF.to_tensor(img)
+        img = my_tf.imagenet_normalization(img)
+
+        if self.mode == 'train_offline' or self.mode == 'train_online':
+
+            label = TF.to_tensor(label)
+
+            label_water = label == 1
+            mask = torch.cat((label_water, label_water, label_water), 0)
+            img_water = torch.where(mask, img, self.black_tensor3)
+            label_water = torch.cat((label_water.float(), self.black_tensor1), 0)
+
+            label_bg = ~mask
+            img_bg = torch.where(label_bg, img, self.black_tensor3)
+            label_bg = label_bg[0].unsqueeze(0)
+            label_bg = torch.cat((self.black_tensor1, label_bg.float()), 0)
+        
+            sample = {
+                'img': torch.cat((img_water, img_bg), 0),
+                'label': torch.cat((label_water, label_bg), 0)
+            }
+        else:
+            sample = {
+                'img': img
+            }
+
+        return sample
+
+
+class WaterDataset_RGBMask(WaterDataset):
+
+    def __init__(self, mode, dataset_path, input_size=None, test_case=None):
+
+        super(WaterDataset_RGBMask, self).__init__(mode, dataset_path, input_size, test_case)
+
     def __getitem__(self, index):
         
         if self.mode == 'train_offline':
@@ -106,15 +219,6 @@ class WaterDataset(data.Dataset):
             img = load_image_in_PIL(self.img_list[index])
             sample = self.apply_transforms(img)
             return sample
-    
-    def __len__(self):
-        if self.mode == 'train_online':
-            return self.online_augmentation_per_epoch
-        else:
-            return len(self.img_list)
-
-    def get_first_frame_label(self):
-        return TF.to_tensor(self.first_frame_label)
 
     def apply_transforms(self, img, mask=None, label=None):
 

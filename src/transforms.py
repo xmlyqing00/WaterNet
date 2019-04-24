@@ -42,7 +42,8 @@ def random_affine_transformation(img, mask, label, verbose=False):
         resample = Image.BICUBIC
 
         img = TF.affine(img, degrees, (translate_h, translate_v), scale, shear, resample)
-        mask = TF.affine(mask, degrees, (translate_h, translate_v), scale, shear, resample)
+        if mask:
+            mask = TF.affine(mask, degrees, (translate_h, translate_v), scale, shear, resample)
         label = TF.affine(label, degrees, (translate_h, translate_v), scale, shear, resample)
 
         if verbose:
@@ -52,13 +53,17 @@ def random_affine_transformation(img, mask, label, verbose=False):
     if random.random() < 0.5:
         
         img = TF.hflip(img)
-        mask = TF.hflip(mask)
+        if mask:
+            mask = TF.hflip(mask)
         label = TF.hflip(label)
 
         if verbose:
             print('Horizontal flip')
 
-    return img, mask, label
+    if mask:
+        return img, mask, label
+    else:
+        return img, label
 
 def random_mask_perturbation(mask, verbose=False):
 
@@ -124,13 +129,17 @@ def random_resized_crop(img, mask, label, size, verbose=False):
         h = w
 
     img = TF.resized_crop(img, y, x, h, w, size, Image.BICUBIC)
-    mask = TF.resized_crop(mask, y, x, h, w, size, Image.BICUBIC)
+    if mask:
+        mask = TF.resized_crop(mask, y, x, h, w, size, Image.BICUBIC)
     label = TF.resized_crop(label, y, x, h, w, size, Image.BICUBIC)
 
     if verbose:
         print('x: %d, y: %d, w: %d, h: %d' % (x, y, w, h))
 
-    return img, mask, label
+    if mask:
+        return img, mask, label
+    else:
+        return img, label
 
 def imagenet_normalization(img_tensor):
 

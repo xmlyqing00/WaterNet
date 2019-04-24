@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 
-from cvt_object_label import cvt_object_label
+from src.cvt_object_label import cvt_object_label
 
 def add_mask_to_image(image, mask, label_color):
     
@@ -75,13 +75,12 @@ def cvt_images_to_overlays(image_folder,
         print("Add mask to image:", image_idx, output_path)
 
 
-def run_cvt_images_to_overlays():
+def run_cvt_images_to_overlays(video_name, model_name='RGBMaskNet_segs'):
+
     root_folder = '/Ship01/Dataset/water/collection/'
-    test_name = 'schbeach'
-    model_name = 'MaskTrackNet_segs/'
-    image_folder = os.path.join(root_folder, 'test_videos/', test_name)
-    mask_folder = os.path.join(root_folder, model_name, test_name)
-    output_folder = os.path.join(root_folder, 'overlays/', model_name, test_name)
+    image_folder = os.path.join(root_folder, 'test_videos/', video_name)
+    mask_folder = os.path.join(root_folder, model_name, video_name)
+    output_folder = os.path.join(root_folder, 'overlays/', model_name, video_name)
     label_color = (255, 255, 255)
     stride = 1
     frame_st = 0
@@ -98,5 +97,5 @@ def run_add_mask_to_image():
 
 if __name__ == '__main__':
     
-    run_cvt_images_to_overlays()
+    run_cvt_images_to_overlays('Holiday_Inn')
     # run_add_mask_to_image()
