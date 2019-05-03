@@ -30,10 +30,10 @@ def train_RGBMaskNet():
         '--online', action='store_true',
         help='If the online flag is set, model will be trained in online mode, user must provide video name.')
     parser.add_argument(
-        '--total-epochs', default=int(cfg['params']['total_epochs']), type=int, metavar='N',
+        '--total-epochs', default=int(cfg['params_rgbm']['total_epochs']), type=int, metavar='N',
         help='Number of total epochs to run (default 100).')
     parser.add_argument(
-        '--lr', default=float(cfg['params']['lr']), type=float, metavar='LR', 
+        '--lr', default=float(cfg['params_rgbm']['lr']), type=float, metavar='LR', 
         help='Initial learning rate.')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
@@ -57,19 +57,19 @@ def train_RGBMaskNet():
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': int(cfg['params']['num_workers']),
-            'pin_memory': bool(cfg['params']['pin_memory'])
+            'num_workers': int(cfg['params_rgbm']['num_workers']),
+            'pin_memory': bool(cfg['params_rgbm']['pin_memory'])
         }
 
     if not args.online:
         dataset = WaterDataset_RGBMask(
             mode='train_offline',
             dataset_path=cfg['paths']['dataset'],
-            input_size=(int(cfg['params']['input_w']), int(cfg['params']['input_h']))
+            input_size=(int(cfg['params_rgbm']['input_w']), int(cfg['params_rgbm']['input_h']))
         )
         train_loader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=int(cfg['params']['batch_size']),
+            batch_size=int(cfg['params_rgbm']['batch_size']),
             shuffle=True,
             **dataset_args
         )
@@ -77,12 +77,12 @@ def train_RGBMaskNet():
         dataset = WaterDataset_RGBMask(
             mode='train_online',
             dataset_path=cfg['paths']['dataset'],
-            input_size=(int(cfg['params']['input_w']), int(cfg['params']['input_h'])),
+            input_size=(int(cfg['params_rgbm']['input_w']), int(cfg['params_rgbm']['input_h'])),
             test_case=args.video_name
         )
         train_loader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=int(cfg['params']['batch_size']),
+            batch_size=int(cfg['params_rgbm']['batch_size']),
             shuffle=False,
             **dataset_args
         )
@@ -91,7 +91,7 @@ def train_RGBMaskNet():
     rgbmask_net = RGBMaskNet().to(device)
 
     # Criterion and Optimizor
-    criterion = torch.nn.BCEWithLogitsLoss().to(device)
+    criterion = torch.nn.BCELoss().to(device)
 
     optimizer = torch.optim.SGD(
         params=rgbmask_net.parameters(),
@@ -129,7 +129,7 @@ def train_RGBMaskNet():
     epoch_time = AverageMeter()
 
     # Without previous mask
-    # blank_mask = torch.zeros(int(cfg['params']['batch_size']), 1, 300, 300)
+    # blank_mask = torch.zeros(int(cfg['params_rgbm']['batch_size']), 1, 300, 300)
     training_mode = 'Offline'
     if args.online:
         training_mode = 'Online'
@@ -149,7 +149,7 @@ def train_RGBMaskNet():
         ))
 
         for i, sample in enumerate(train_loader):
-                        
+            
             img, mask = sample['img'].to(device), sample['mask'].to(device)
             img_mask = torch.cat([img, mask], 1)
             
@@ -169,7 +169,7 @@ def train_RGBMaskNet():
                 batch_endtime = time.time()
 
                 print('Batch: [{0:4}/{1:4}]\t'
-                      'Time: {batch_time.val:.3f}s ({batch_time.sum:.3f}s)\t'
+                      'Time: {batch_time.val:.0f}s ({batch_time.sum:.0f}s)  \t'
                       'Loss: {loss.val:.4f} ({loss.avg:.4f})'.format(
                       i, len(train_loader) - 1, 
                       batch_time=batch_time, loss=losses))
@@ -177,15 +177,15 @@ def train_RGBMaskNet():
         epoch_time.update(time.time() - epoch_endtime)
         epoch_endtime = time.time()
 
-        print('Time: {epoch_time.val:.3f}s ({epoch_time.sum:.3f}s)\t'
+        print('Time: {epoch_time.val:.0f}s ({epoch_time.sum:.0f}s)  \t'
               'Avg loss: {loss.avg:.4f}'.format(
               epoch_time=epoch_time, loss=losses))
 
         if (epoch + 1) % 10 == 0 or (i + 1) == args.total_epochs:
             suffix = ''
             if args.online:
-                suffix = '_online_' + args.video_name
-            model_path = os.path.join(cfg['paths']['models'], 'checkpoint_{0}{1}.pth.tar'.format(epoch, suffix))
+                suffix = '_' + args.video_name
+            model_path = os.path.join(cfg['paths']['models'], 'checkpoint_RGBMaskNet_{0}{1}.pth.tar'.format(epoch, suffix))
             torch.save(
                 obj={
                     'epoch': epoch,

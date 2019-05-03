@@ -30,8 +30,9 @@ def cvt_object_label(img, ori_label_color, dst_label_color=None):
 
 if __name__ == '__main__':
 
-    folder = '/Ship01/Dataset/water/collection/test_annots/schbeach/'
-    frame_name = 'schbeach_09-10-2018-16-57-13_0'
+    video_name = 'Holiday_Inn_night'
+    folder = os.path.join('/Ship01/Dataset/water/collection/test_annots/', video_name)
+    frame_name = 'Holiday_Inn_09-10-2018-18-56-17_0'
 
     label = cv2.imread(os.path.join(folder, frame_name, 'label.png'))
     label_w = cvt_object_label(label, (0, 0, 128), (255, 255, 255))

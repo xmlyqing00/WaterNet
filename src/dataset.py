@@ -24,10 +24,12 @@ class WaterDataset(data.Dataset):
         self.img_list = []
         self.label_list = []
         self.verbose_flag = False
-        self.online_augmentation_per_epoch = 6400
+        self.online_augmentation_per_epoch = 1280
         
         if mode == 'train_offline':
-            water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2']
+            water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2', 'river_segs']
+
+            print('Initialize offline training dataset:')
 
             for sub_folder in water_subdirs:
                 img_path = os.path.join(dataset_path, 'imgs/', sub_folder)
@@ -39,6 +41,8 @@ class WaterDataset(data.Dataset):
                 label_list = os.listdir(label_path)
                 label_list.sort(key = lambda x: (len(x), x))
                 self.label_list += [os.path.join(label_path, name) for name in label_list]
+
+                print('Add', sub_folder, len(img_list), 'files.')
 
         elif mode == 'train_online':
             if test_case is None:
@@ -60,7 +64,7 @@ class WaterDataset(data.Dataset):
 
             # print(first_frame_path, first_frame_label_path)
 
-            self.first_frame = load_image_in_PIL(first_frame_path)
+            self.first_frame = load_image_in_PIL(first_frame_path).convert('RGB')
             self.first_frame_label = load_image_in_PIL(first_frame_label_path).convert('L')
 
             # print(self.first_frame)
@@ -119,7 +123,7 @@ class WaterDataset_PFD(WaterDataset):
     def __getitem__(self, index):
 
         if self.mode == 'train_offline':
-            img = load_image_in_PIL(self.img_list[index])
+            img = load_image_in_PIL(self.img_list[index]).convert('RGB')
             label = load_image_in_PIL(self.label_list[index]).convert('L')
 
             sample = self.apply_transforms(img, label)
@@ -130,7 +134,7 @@ class WaterDataset_PFD(WaterDataset):
             return sample
 
         elif self.mode == 'eval':
-            img = load_image_in_PIL(self.img_list[index])
+            img = load_image_in_PIL(self.img_list[index]).convert('RGB')
             sample = self.apply_transforms(img)
             return sample
 
@@ -205,7 +209,7 @@ class WaterDataset_RGBMask(WaterDataset):
     def __getitem__(self, index):
         
         if self.mode == 'train_offline':
-            img = load_image_in_PIL(self.img_list[index])
+            img = load_image_in_PIL(self.img_list[index]).convert('RGB')
             label = load_image_in_PIL(self.label_list[index]).convert('L')
             
             sample = self.apply_transforms(img, label, label)
@@ -216,7 +220,7 @@ class WaterDataset_RGBMask(WaterDataset):
             return sample
 
         elif self.mode == 'eval':
-            img = load_image_in_PIL(self.img_list[index])
+            img = load_image_in_PIL(self.img_list[index]).convert('RGB')
             sample = self.apply_transforms(img)
             return sample
 
@@ -270,6 +274,11 @@ class WaterDataset_RGBMask(WaterDataset):
             mask = TF.to_tensor(mask)
             label = TF.to_tensor(label)
 
+            # if (img.shape[0] != 3):
+                # print('img', img.shape)
+            # print('mask', mask.shape)
+            # print('label', label.shape)
+            
             sample = {
                 'img': img,
                 'mask': mask,

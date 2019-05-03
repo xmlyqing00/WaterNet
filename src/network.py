@@ -35,6 +35,7 @@ class PureFeatureDetectorNet(nn.Module):
         self.blend1 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
         self.bn_blend = nn.BatchNorm2d(64)
         self.blend2 = nn.Conv2d(64, class_n, kernel_size=3, padding=1)
+        self.sigmoid = nn.Sigmoid()
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -112,6 +113,7 @@ class PureFeatureDetectorNet(nn.Module):
         x = self.relu(x)
 
         x = self.blend2(x)
+        x = self.sigmoid(x)
 
         return x
 
@@ -149,6 +151,8 @@ class RGBMaskNet(nn.Module):
         self.deconv2 = self._make_deconv_layer(256, 128)
         self.deconv3 = self._make_deconv_layer(128, 64)
         self.deconv4 = self._make_deconv_layer(64, 1, stride=4)
+
+        self.sigmoid = nn.Sigmoid()
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -237,6 +241,8 @@ class RGBMaskNet(nn.Module):
         x = self.deconv4(x)
         x = self._align_shape(x, input_shape)
         # print(x.shape)
+
+        x = self.sigmoid(x)
 
         return x
 

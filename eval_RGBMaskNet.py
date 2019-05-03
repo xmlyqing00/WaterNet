@@ -38,7 +38,7 @@ def eval_RGBMaskNet():
         '-i', '--video-name', default=None, type=str,
         help='Test video name (default: none).')
     parser.add_argument(
-        '-m', '--model-name', default='RGBMaskNet_segs', type=str,
+        '-m', '--model-name', default='RGBMaskNet', type=str,
         help='Model name for the ouput segmentation, it will create a subfolder under the out_folder (default: none).')
     parser.add_argument(
         '-o', '--out-folder', default=cfg['paths']['dataset'], type=str, metavar='PATH',
@@ -96,7 +96,7 @@ def eval_RGBMaskNet():
     
     if not os.path.exists(args.out_folder):
         os.mkdir(args.out_folder)
-    out_path = os.path.join(args.out_folder, args.model_name)
+    out_path = os.path.join(args.out_folder, args.model_name + '_segs')
     if not os.path.exists(out_path):
         os.mkdir(out_path)
     out_path = os.path.join(out_path, args.video_name)
@@ -115,13 +115,13 @@ def eval_RGBMaskNet():
     pre_frame_mask = pre_frame_mask.unsqueeze(0).to(device)
 
     for i, sample in enumerate(eval_loader):
-        
+
         img = sample['img'].to(device)     
         img_mask = torch.cat([img, pre_frame_mask], 1)  
 
         output = rgbmask_net(img_mask)
 
-        pre_frame_mask = minmax_normalize(output.detach())
+        pre_frame_mask = output.detach()
         seg_raw = TF.to_pil_image(pre_frame_mask.squeeze(0).cpu())
         seg_raw.save(os.path.join(out_path, 'raw_%d.png' % (i + 1)))
 
