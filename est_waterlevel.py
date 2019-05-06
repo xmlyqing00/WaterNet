@@ -2,6 +2,7 @@ import os
 import argparse
 import configparser
 import math
+import copy
 import numpy as np
 import matplotlib.pyplot as plt 
 import matplotlib.dates as mdates
@@ -99,7 +100,7 @@ def est_water_boundary(seg_folder, overlay_folder, out_folder, key_pts):
 
             break
     
-    water_boundary_pts = []
+    water_boundary_pts = copy.deepcopy(key_pts)
 
     for i in range(len(key_pts)):
         
@@ -111,7 +112,7 @@ def est_water_boundary(seg_folder, overlay_folder, out_folder, key_pts):
         
         for y in range(key_pts[i][1] + 1, seg_size[0]):
             if seg[y][key_pts[i][0]] > seg_thres:
-                water_boundary_pts.append([key_pts[i][0], y])
+                water_boundary_pts[i] = (key_pts[i][0], y)
                 
                 overlay = cv2.imread(os.path.join(overlay_folder, overlays_list[i]))
                 cv2.line(overlay, key_pts[i], (key_pts[i][0], y), (200, 0, 0), 2)
@@ -158,6 +159,8 @@ def est_waterlevel(video_name, model_name='RGBMaskNet_online'):
 
     key_pts_y = np.array(key_pts)[:, 1]
     water_boundary_pts_y = np.array(water_boundary_pts)[:, 1]
+
+    print(len(key_pts_y), len(water_boundary_pts_y))
 
     gap = (water_boundary_pts_y - key_pts_y) * cos_v
 

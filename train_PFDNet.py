@@ -91,7 +91,7 @@ def train_PFDNet():
     pfd_net = PureFeatureDetectorNet(2).to(device)
 
     # Criterion and Optimizor
-    criterion = torch.nn.BCEWithLogitsLoss().to(device)
+    criterion = torch.nn.BCELoss().to(device)
 
     optimizer = torch.optim.SGD(
         params=pfd_net.parameters(),
@@ -173,7 +173,7 @@ def train_PFDNet():
                 batch_endtime = time.time()
 
                 print('Batch: [{0:4}/{1:4}]\t'
-                      'Time: {batch_time.val:.0f}s ({batch_time.sum:.0f}s)\t'
+                      'Time: {batch_time.val:.0f}s ({batch_time.sum:.0f}s)  \t'
                       'Loss: {loss.val:.4f} ({loss.avg:.4f})'.format(
                       i, len(train_loader) - 1, 
                       batch_time=batch_time, loss=losses))
@@ -181,7 +181,7 @@ def train_PFDNet():
         epoch_time.update(time.time() - epoch_endtime)
         epoch_endtime = time.time()
 
-        print('Time: {epoch_time.val:.0f}s ({epoch_time.sum:.0f}s)\t'
+        print('Time: {epoch_time.val:.0f}s ({epoch_time.sum:.0f}s)  \t'
               'Avg loss: {loss.avg:.4f}'.format(
               epoch_time=epoch_time, loss=losses))
 
