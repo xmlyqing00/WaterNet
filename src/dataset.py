@@ -27,7 +27,8 @@ class WaterDataset(data.Dataset):
         self.online_augmentation_per_epoch = 1280
         
         if mode == 'train_offline':
-            water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2', 'river_segs']
+            # water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2', 'river_segs']
+            water_subdirs = ['ADE20K', 'river_segs']
 
             print('Initialize offline training dataset:')
 
