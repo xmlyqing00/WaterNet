@@ -1,3 +1,5 @@
+nohup.out
+*.log
 .DS_Store
 .vscode/
 __pycache__/
@@ -6,3 +8,4 @@ data/
 tmp/
 models/*.pth.tar
 models_backup/
+models_all_training/
