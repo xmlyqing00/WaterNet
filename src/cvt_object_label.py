@@ -30,11 +30,11 @@ def cvt_object_label(img, ori_label_color, dst_label_color=None):
 
 if __name__ == '__main__':
 
-    video_name = 'boston_harbor4'
+    video_name = 'stream_test'
     folder = os.path.join('/Ship01/Dataset/water/collection/test_annots/', video_name)
-    frame_name = 'boston_second_May-02-2019-10-47-18'
+    frame_name = 'original_resize_8_json'
 
-    label = cv2.imread(os.path.join(folder, frame_name + '_json', 'label.png'))
+    label = cv2.imread(os.path.join(folder, frame_name, 'label.png'))
     label_w = cvt_object_label(label, (0, 0, 128), (255, 255, 255))
 
-    cv2.imwrite(os.path.join(folder, '%s.png' % frame_name), label_w)
+    cv2.imwrite(os.path.join(folder, '%s.png' % frame_name[:-5]), label_w)

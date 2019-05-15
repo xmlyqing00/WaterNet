@@ -35,11 +35,11 @@ def eval_RGBMaskNet():
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
         help='Path to latest checkpoint (default: none).')
     parser.add_argument(
-        '-i', '--video-name', default=None, type=str,
+        '-v', '--video-name', default=None, type=str,
         help='Test video name (default: none).')
     parser.add_argument(
         '-m', '--model-name', default='RGBMaskNet', type=str,
-        help='Model name for the ouput segmentation, it will create a subfolder under the out_folder (default: none).')
+        help='Model name for the ouput segmentation, it will create a subfolder under the out_folder.')
     parser.add_argument(
         '-o', '--out-folder', default=cfg['paths']['dataset'], type=str, metavar='PATH',
         help='Folder for the output segmentations.')

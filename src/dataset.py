@@ -24,7 +24,7 @@ class WaterDataset(data.Dataset):
         self.img_list = []
         self.label_list = []
         self.verbose_flag = False
-        self.online_augmentation_per_epoch = 1280
+        self.online_augmentation_per_epoch = 640
         
         if mode == 'train_offline':
             # water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2', 'river_segs']

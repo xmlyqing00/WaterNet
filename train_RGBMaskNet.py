@@ -11,9 +11,13 @@ from src.dataset import WaterDataset_RGBMask
 from src.avg_meter import AverageMeter
 
 
-def adjust_learning_rate(optimizer, start_lr, epoch):
-    """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
-    lr = start_lr * (0.1 ** (epoch // 40))
+def adjust_learning_rate(optimizer, start_lr, epoch, online_mode):
+    """Sets the learning rate to the initial LR decayed by 10 every x epochs"""
+    if online_mode:
+        decay_iters = 10
+    else:
+        decay_iters = 40
+    lr = start_lr * (0.1 ** (epoch // decay_iters))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -47,6 +51,9 @@ def train_RGBMaskNet():
 
     assert(not args.online or (args.online and args.checkpoint))
     assert(not args.online or (args.online and args.video_name))
+
+    if args.online and args.lr == float(cfg['params_rgbm']['lr']):
+        args.lr /= 10
 
     # Device
     device = torch.device('cpu')
@@ -140,7 +147,7 @@ def train_RGBMaskNet():
         batch_time = AverageMeter()
         batch_endtime = time.time()
 
-        adjust_learning_rate(optimizer, args.lr, epoch)   
+        adjust_learning_rate(optimizer, args.lr, epoch - start_epoch, args.online)   
         lr = -1
         for param_group in optimizer.param_groups:
             lr = param_group['lr']
@@ -163,7 +170,7 @@ def train_RGBMaskNet():
 
             losses.update(loss.item())
 
-            if (i + 1) % 10 == 0 or (i + 1) == len(train_loader):
+            if args.online or ((i + 1) % 10 == 0 or (i + 1) == len(train_loader)):
 
                 batch_time.update(time.time() - batch_endtime)
                 batch_endtime = time.time()
