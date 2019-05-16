@@ -110,6 +110,65 @@ class WaterDataset(data.Dataset):
         raise NotImplementedError
 
 
+class WaterDataset_OSVOS(WaterDataset):
+
+    def __init__(self, mode, dataset_path, input_size=None, test_case=None):
+
+        super(WaterDataset_OSVOS, self).__init__(mode, dataset_path, input_size, test_case)
+
+    def __getitem__(self, index):
+
+        if self.mode == 'train_offline':
+            img = load_image_in_PIL(self.img_list[index]).convert('RGB')
+            label = load_image_in_PIL(self.label_list[index]).convert('L')
+
+            sample = self.apply_transforms(img, label)
+            return sample
+
+        elif self.mode == 'train_online':
+            sample = self.apply_transforms(self.first_frame, self.first_frame_label)
+            return sample
+
+        elif self.mode == 'eval':
+            img = load_image_in_PIL(self.img_list[index]).convert('RGB')
+            sample = self.apply_transforms(img)
+            return sample
+
+
+    def apply_transforms(self, img, label=None):
+
+        if self.mode == 'train_offline' or self.mode == 'train_online':
+            
+            img = my_tf.random_adjust_color(img, self.verbose_flag)
+            img, label = my_tf.random_affine_transformation(img, None, label, self.verbose_flag)
+            img, label = my_tf.random_resized_crop(img, None, label, self.input_size, self.verbose_flag)
+
+        elif self.mode == 'eval':
+            pass
+
+        img = TF.to_tensor(img)
+        img = my_tf.imagenet_normalization(img)
+
+        if self.mode == 'train_offline' or self.mode == 'train_online':
+
+            label = TF.to_tensor(label)
+
+            # if (img.shape[0] != 3):
+                # print('img', img.shape)
+            # print('mask', mask.shape)
+            # print('label', label.shape)
+            
+            sample = {
+                'img': img,
+                'label': label
+            }
+        else:
+            sample = {
+                'img': img
+            }
+
+        return sample
+
 class WaterDataset_PFD(WaterDataset):
 
     def __init__(self, mode, dataset_path, input_size=None, test_case=None):
@@ -141,7 +200,7 @@ class WaterDataset_PFD(WaterDataset):
 
     def apply_transforms(self, img, label=None):
         
-        if self.mode == 'train_offline':
+        if self.mode == 'train_offline' or self.mode == 'train_online':
             
             # img.save('tmp/ori_img.png')
             # label.save('tmp/ori_label.png')
@@ -156,18 +215,6 @@ class WaterDataset_PFD(WaterDataset):
 
             # img.save('tmp/crop_img.png')
             # label.save('tmp/crop_label.png')
-
-        elif self.mode == 'train_online':
-            
-            # img.save('tmp/img_ori.png')
-
-            img = my_tf.random_adjust_color(img, self.verbose_flag)
-            img, label = my_tf.random_affine_transformation(img, None, label, self.verbose_flag)
-            img, label = my_tf.random_resized_crop(img, None, label, self.input_size, self.verbose_flag)
-
-            # img.save('tmp/img_crop.png')
-            # mask.save('tmp/mask_crop.png')
-            # label.save('tmp/label_crop.png')
 
         elif self.mode == 'eval':
             pass
@@ -227,7 +274,7 @@ class WaterDataset_RGBMask(WaterDataset):
 
     def apply_transforms(self, img, mask=None, label=None):
 
-        if self.mode == 'train_offline':
+        if self.mode == 'train_offline' or self.mode == 'train_online':
             
             # img.save('tmp/ori_img.png')
             # mask.save('tmp/ori_mask.png')
@@ -250,19 +297,6 @@ class WaterDataset_RGBMask(WaterDataset):
             # img.save('tmp/crop_img.png')
             # mask.save('tmp/crop_mask.png')
             # label.save('tmp/crop_label.png')
-
-        elif self.mode == 'train_online':
-            
-            # img.save('tmp/img_ori.png')
-
-            img = my_tf.random_adjust_color(img, self.verbose_flag)
-            img, mask, label = my_tf.random_affine_transformation(img, mask, label, self.verbose_flag)
-            mask = my_tf.random_mask_perturbation(mask, self.verbose_flag)
-            img, mask, label = my_tf.random_resized_crop(img, mask, label, self.input_size, self.verbose_flag)
-
-            # img.save('tmp/img_crop.png')
-            # mask.save('tmp/mask_crop.png')
-            # label.save('tmp/label_crop.png')
 
         elif self.mode == 'eval':
             pass
