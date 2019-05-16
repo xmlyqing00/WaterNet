@@ -192,7 +192,7 @@ def train_RGBMaskNet():
             suffix = ''
             if args.online:
                 suffix = '_' + args.video_name
-            model_path = os.path.join(cfg['paths']['models'], 'checkpoint_RGBMaskNet_{0}{1}.pth.tar'.format(epoch, suffix))
+            model_path = os.path.join(cfg['paths']['models'], 'cp_RGBMaskNet_{0}{1}.pth.tar'.format(epoch, suffix))
             torch.save(
                 obj={
                     'epoch': epoch,
