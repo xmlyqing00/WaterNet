@@ -34,10 +34,10 @@ def train_OSVOSNet():
         '--online', action='store_true',
         help='If the online flag is set, model will be trained in online mode, user must provide video name.')
     parser.add_argument(
-        '--total-epochs', default=int(cfg['params_rgbm']['total_epochs']), type=int, metavar='N',
+        '--total-epochs', default=int(cfg['params_osvos']['total_epochs']), type=int, metavar='N',
         help='Number of total epochs to run (default 100).')
     parser.add_argument(
-        '--lr', default=float(cfg['params_rgbm']['lr']), type=float, metavar='LR', 
+        '--lr', default=float(cfg['params_osvos']['lr']), type=float, metavar='LR', 
         help='Initial learning rate.')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
@@ -52,7 +52,7 @@ def train_OSVOSNet():
     assert(not args.online or (args.online and args.checkpoint))
     assert(not args.online or (args.online and args.video_name))
 
-    if args.online and args.lr == float(cfg['params_rgbm']['lr']):
+    if args.online and args.lr == float(cfg['params_osvos']['lr']):
         args.lr /= 10
 
     # Device
@@ -64,19 +64,19 @@ def train_OSVOSNet():
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': int(cfg['params_rgbm']['num_workers']),
-            'pin_memory': bool(cfg['params_rgbm']['pin_memory'])
+            'num_workers': int(cfg['params_osvos']['num_workers']),
+            'pin_memory': bool(cfg['params_osvos']['pin_memory'])
         }
 
     if not args.online:
         dataset = WaterDataset_OSVOS(
             mode='train_offline',
             dataset_path=cfg['paths']['dataset'],
-            input_size=(int(cfg['params_rgbm']['input_w']), int(cfg['params_rgbm']['input_h']))
+            input_size=(int(cfg['params_osvos']['input_w']), int(cfg['params_osvos']['input_h']))
         )
         train_loader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=int(cfg['params_rgbm']['batch_size']),
+            batch_size=int(cfg['params_osvos']['batch_size']),
             shuffle=True,
             **dataset_args
         )
@@ -84,12 +84,12 @@ def train_OSVOSNet():
         dataset = WaterDataset_OSVOS(
             mode='train_online',
             dataset_path=cfg['paths']['dataset'],
-            input_size=(int(cfg['params_rgbm']['input_w']), int(cfg['params_rgbm']['input_h'])),
+            input_size=(int(cfg['params_osvos']['input_w']), int(cfg['params_osvos']['input_h'])),
             test_case=args.video_name
         )
         train_loader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=int(cfg['params_rgbm']['batch_size']),
+            batch_size=int(cfg['params_osvos']['batch_size']),
             shuffle=False,
             **dataset_args
         )
@@ -133,8 +133,6 @@ def train_OSVOSNet():
 
     epoch_time = AverageMeter()
 
-    # Without previous mask
-    # blank_mask = torch.zeros(int(cfg['params_rgbm']['batch_size']), 1, 300, 300)
     training_mode = 'Offline'
     if args.online:
         training_mode = 'Online'
@@ -148,24 +146,28 @@ def train_OSVOSNet():
         for j in range(5):
             running_loss_tr.append(AverageMeter())
 
-        adjust_learning_rate(optimizer, args.lr, epoch - start_epoch, args.online)   
+        if args.online:
+            adjust_learning_rate(optimizer, args.lr, epoch - start_epoch, args.online)   
+        else:
+            adjust_learning_rate(optimizer, args.lr, epoch, args.online)   
         lr = -1
         for param_group in optimizer.param_groups:
             lr = param_group['lr']
-        print('\n=== {0} Training Epoch: [{1:4}/{2:4}]\tlr: {3:.6f} ==='.format(
+            break
+            
+        print('\n=== {0} Training Epoch: [{1:4}/{2:4}]\tlr: {3:.8f} ==='.format(
             training_mode, epoch, args.total_epochs - 1, lr
         ))
 
         for i, sample in enumerate(train_loader):
 
             img, label = sample['img'].to(device), sample['label'].to(device)
-            
-            outputs = rgbmask_net(img)
+            outputs = OSVOS_net(img)
 
             layer_losses = [0] * len(outputs)
-            for i in range(0, len(outputs)):
-                layer_losses[i] = class_balanced_cross_entropy_loss(outputs[i], label, size_average=False)
-                running_loss_tr[i].update(layer_losses[i].item())
+            for j in range(0, len(outputs)):
+                layer_losses[j] = class_balanced_cross_entropy_loss(outputs[j], label, size_average=False)
+                running_loss_tr[j].update(layer_losses[j].item())
             loss = (1 - epoch / args.total_epochs) * sum(layer_losses[:-1]) + layer_losses[-1]
 
             optimizer.zero_grad()
@@ -185,9 +187,9 @@ def train_OSVOSNet():
                       i, len(train_loader) - 1, 
                       batch_time=batch_time, loss=losses))
                 
-                for j in range(5):
-                    print('\tRunning loss {0}: {loss.val:.4f} ({loss.avg:.4f})'.format(
-                        j, loss=running_loss_tr[j]))
+                # for j in range(5):
+                #     print('\tRunning loss {0}: {loss.val:.4f} ({loss.avg:.4f})'.format(
+                #         j, loss=running_loss_tr[j]))
 
         epoch_time.update(time.time() - epoch_endtime)
         epoch_endtime = time.time()
@@ -204,7 +206,7 @@ def train_OSVOSNet():
             torch.save(
                 obj={
                     'epoch': epoch,
-                    'model': rgbmask_net.state_dict(),
+                    'model': OSVOS_net.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'loss': losses.avg,
                 },

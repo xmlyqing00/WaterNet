@@ -115,25 +115,30 @@ class WaterDataset_OSVOS(WaterDataset):
     def __init__(self, mode, dataset_path, input_size=None, test_case=None):
 
         super(WaterDataset_OSVOS, self).__init__(mode, dataset_path, input_size, test_case)
+        self.eval_size = (640, 640)
 
     def __getitem__(self, index):
-
+        
         if self.mode == 'train_offline':
             img = load_image_in_PIL(self.img_list[index]).convert('RGB')
             label = load_image_in_PIL(self.label_list[index]).convert('L')
 
             sample = self.apply_transforms(img, label)
-            return sample
 
         elif self.mode == 'train_online':
             sample = self.apply_transforms(self.first_frame, self.first_frame_label)
-            return sample
 
         elif self.mode == 'eval':
             img = load_image_in_PIL(self.img_list[index]).convert('RGB')
+            self.origin_size = img.size
+            img.thumbnail(self.eval_size, Image.ANTIALIAS)
+            # print(self.origin_size, img.size)
             sample = self.apply_transforms(img)
-            return sample
+        
+        return sample
 
+    def resize_to_origin(self, img):
+        return img.resize(self.first_frame_label.size)
 
     def apply_transforms(self, img, label=None):
 

@@ -95,13 +95,13 @@ def train_RGBMaskNet():
         )
 
     # Model
-    rgbmask_net = RGBMaskNet().to(device)
+    RGBMask_net = RGBMaskNet().to(device)
 
     # Criterion and Optimizor
     criterion = torch.nn.BCELoss().to(device)
 
     optimizer = torch.optim.SGD(
-        params=rgbmask_net.parameters(),
+        params=RGBMask_net.parameters(),
         lr=args.lr,
         momentum=0.9,
         dampening=1e-4
@@ -114,7 +114,7 @@ def train_RGBMaskNet():
             print('Load checkpoint \'{}\''.format(args.checkpoint))
             checkpoint = torch.load(args.checkpoint)
             start_epoch = checkpoint['epoch'] + 1
-            rgbmask_net.load_state_dict(checkpoint['model'])
+            RGBMask_net.load_state_dict(checkpoint['model'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             print('Loaded checkpoint \'{}\' (epoch {})'
                   .format(args.checkpoint, checkpoint['epoch']))
@@ -124,10 +124,10 @@ def train_RGBMaskNet():
         print('Load pretrained ResNet 34.')
         resnet34_url = 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'
         pretrained_model = model_zoo.load_url(resnet34_url)
-        rgbmask_net.load_pretrained_model(pretrained_model)
+        RGBMask_net.load_pretrained_model(pretrained_model)
 
     # Set train mode
-    rgbmask_net.train()
+    RGBMask_net.train()
 
     epoch_endtime = time.time()
     if not os.path.exists(cfg['paths']['models']):
@@ -160,7 +160,7 @@ def train_RGBMaskNet():
             img, mask = sample['img'].to(device), sample['mask'].to(device)
             img_mask = torch.cat([img, mask], 1)
             
-            output = rgbmask_net(img_mask)
+            output = RGBMask_net(img_mask)
 
             label = sample['label'].to(device)
             loss = criterion(output, label)
@@ -196,7 +196,7 @@ def train_RGBMaskNet():
             torch.save(
                 obj={
                     'epoch': epoch,
-                    'model': rgbmask_net.state_dict(),
+                    'model': RGBMask_net.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'loss': losses.avg,
                 },
