@@ -98,7 +98,7 @@ def show_feature_map_similarity():
     VisFeatureMap_net.to(device).eval()
     
     # Feature map 0
-    test_id = 7
+    test_id = 35
     sample = dataset[test_id]
 
     img = sample['img'].to(device).unsqueeze(0)     
@@ -106,7 +106,7 @@ def show_feature_map_similarity():
     feature_map0 = VisFeatureMap_net(img).detach().squeeze(0).numpy()
 
     # Feature map 1
-    test_id = 8
+    test_id = 34
     sample = dataset[test_id]
 
     img = sample['img'].to(device).unsqueeze(0)     
@@ -115,20 +115,25 @@ def show_feature_map_similarity():
 
     # Feature diff
     c, h, w = feature_map0.shape
+    print(c, h, w)
+
+    # Position
+    x, y = 20, 20
+
+    fig, axes = plt.subplots(nrows=1, ncols=2)
 
     diff_map = (feature_map0 - feature_map1) ** 2
     diff_map = np.sqrt(np.sum(diff_map, 0) / c)
-    fig = plt.imshow(diff_map, cmap='plasma', interpolation='nearest')
-    plt.colorbar(fig)
+    axes[0].imshow(diff_map, cmap='plasma', interpolation='nearest')
     
-    vec = feature_map1[:,15,26]
+    vec = feature_map1[:,y,x]
     vec_tile = np.tile(vec, h * w).reshape(h, w, c).transpose(2, 0, 1)
 
     diff_map = (feature_map1 - vec_tile) ** 2
     diff_map = np.sqrt(np.sum(diff_map, 0) / c)
-    plt.figure()
-    fig = plt.imshow(diff_map, cmap='plasma', interpolation='nearest')
-    plt.colorbar(fig)
+    im = axes[1].imshow(diff_map, cmap='plasma', interpolation='nearest')
+    
+    fig.colorbar(im, ax=axes.ravel().tolist())
 
     plt.show()
 

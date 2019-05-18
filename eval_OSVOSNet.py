@@ -127,7 +127,7 @@ def eval_OSVOSNetNet():
             'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
             i + 1, len(eval_loader), running_time=running_time))
 
-    run_cvt_images_to_overlays(args.video_name, args.out_folder args.model_name)
+    run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name)
     
 if __name__ == '__main__':
     eval_OSVOSNetNet()
