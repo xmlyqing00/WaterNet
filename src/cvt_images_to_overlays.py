@@ -75,9 +75,8 @@ def cvt_images_to_overlays(image_folder,
         print("Add mask to image:", image_idx, output_path)
 
 
-def run_cvt_images_to_overlays(video_name, model_name='RGBMaskNet'):
+def run_cvt_images_to_overlays(video_name, root_folder, model_name='RGBMaskNet'):
 
-    root_folder = '/Ship01/Dataset/water/collection/'
     image_folder = os.path.join(root_folder, 'test_videos/', video_name)
     mask_folder = os.path.join(root_folder, model_name + '_segs', video_name)
     output_folder = os.path.join(root_folder, model_name + '_overlays', video_name)
@@ -97,5 +96,6 @@ def run_add_mask_to_image():
 
 if __name__ == '__main__':
     
-    run_cvt_images_to_overlays('Holiday_Inn')
+    root_folder = '/Ship01/Dataset/water/collection/'
+    run_cvt_images_to_overlays('canal0', root_folder, 'OSVOSNet_online')
     # run_add_mask_to_image()

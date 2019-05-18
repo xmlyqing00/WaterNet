@@ -2,19 +2,19 @@ import os
 import argparse
 import sys
 import time
+import numpy as np
 import cv2
 import torch
 import configparser
 import torchvision.transforms.functional as TF
+import matplotlib.pyplot as plt
 from PIL import Image
 
-from src.network import RGBMaskNet
-from src.dataset import WaterDataset_RGBMask
-from src.avg_meter import AverageMeter
-from src.cvt_images_to_overlays import run_cvt_images_to_overlays
+from src.network import VisFeatureMapNet
+from src.dataset import WaterDataset_OSVOS
 
 
-def eval_RGBMaskNet():
+def show_feature_map_similarity():
     
     # Paths
     cfg = configparser.ConfigParser()
@@ -26,16 +26,13 @@ def eval_RGBMaskNet():
         cfg_dataset = 'dataset_linux'
 
     # Hyper parameters
-    parser = argparse.ArgumentParser(description='PyTorch RGBMaskNet Testing')
+    parser = argparse.ArgumentParser(description='PyTorch VisFeatureMapNet Testing')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
         help='Path to latest checkpoint (default: none).')
     parser.add_argument(
         '-v', '--video-name', default=None, type=str,
         help='Test video name (default: none).')
-    parser.add_argument(
-        '-m', '--model-name', default='RGBMaskNet', type=str,
-        help='Model name for the ouput segmentation, it will create a subfolder under the out_folder.')
     parser.add_argument(
         '-o', '--out-folder', default=cfg['paths'][cfg_dataset], type=str, metavar='PATH',
         help='Folder for the output segmentations.')
@@ -62,7 +59,7 @@ def eval_RGBMaskNet():
             'pin_memory': bool(cfg['params']['pin_memory'])
         }
 
-    dataset = WaterDataset_RGBMask(
+    dataset = WaterDataset_OSVOS(
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name
@@ -75,60 +72,66 @@ def eval_RGBMaskNet():
     )
 
     # Model
-    rgbmask_net = RGBMaskNet().to(device)
+    VisFeatureMap_net = VisFeatureMapNet()
 
     # Load pretrained model
     if os.path.isfile(args.checkpoint):
         print('Load checkpoint \'{}\''.format(args.checkpoint))
-        checkpoint = torch.load(args.checkpoint)
+        if torch.cuda.is_available():
+            checkpoint = torch.load(args.checkpoint)
+        else:
+            checkpoint = torch.load(args.checkpoint, map_location='cpu')
         args.start_epoch = checkpoint['epoch'] + 1
-        rgbmask_net.load_state_dict(checkpoint['model'])
+        VisFeatureMap_net.load_state_dict(checkpoint['model'])
         print('Loaded checkpoint \'{}\' (epoch {})'
                 .format(args.checkpoint, checkpoint['epoch']))
     else:
         raise ValueError('No checkpoint found at \'{}\''.format(args.checkpoint))
 
     # Set ouput path
-    out_path = os.path.join(args.out_folder, args.model_name + '_segs', args.video_name)
+    
+    out_path = os.path.join(args.out_folder, 'visualization')
     if not os.path.exists(out_path):
         os.makedirs(out_path)
 
     # Start testing
-    rgbmask_net.eval()
-    running_time = AverageMeter()
-    running_endtime = time.time()
+    VisFeatureMap_net.to(device).eval()
     
-    # First frame annotation
-    pre_frame_mask = dataset.get_first_frame_label()
-    first_frame_seg = TF.to_pil_image(pre_frame_mask)
-    first_frame_seg.save(os.path.join(out_path, '0.png'))
-    pre_frame_mask = pre_frame_mask.unsqueeze(0).to(device)
+    # Feature map 0
+    test_id = 7
+    sample = dataset[test_id]
 
-    for i, sample in enumerate(eval_loader):
+    img = sample['img'].to(device).unsqueeze(0)     
 
-        img = sample['img'].to(device)     
-        img_mask = torch.cat([img, pre_frame_mask], 1)  
+    feature_map0 = VisFeatureMap_net(img).detach().squeeze(0).numpy()
 
-        output = rgbmask_net(img_mask)
+    # Feature map 1
+    test_id = 8
+    sample = dataset[test_id]
 
-        pre_frame_mask = output.detach()
-        seg_raw = TF.to_pil_image(pre_frame_mask.squeeze(0).cpu())
-        seg_raw.save(os.path.join(out_path, 'raw_%d.png' % (i + 1)))
+    img = sample['img'].to(device).unsqueeze(0)     
 
-        zero_tensor = torch.zeros(pre_frame_mask.shape).to(device)
-        one_tensor = torch.ones(pre_frame_mask.shape).to(device)
-        pre_frame_mask = torch.where(pre_frame_mask > water_thres, pre_frame_mask, zero_tensor)
-        seg = TF.to_pil_image(pre_frame_mask.squeeze(0).cpu())
-        seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
+    feature_map1 = VisFeatureMap_net(img).detach().squeeze(0).numpy()
 
-        running_time.update(time.time() - running_endtime)
-        running_endtime = time.time()
+    # Feature diff
+    c, h, w = feature_map0.shape
 
-        print('Segment: [{0:4}/{1:4}]\t'
-            'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
-            i + 1, len(eval_loader), running_time=running_time))
+    diff_map = (feature_map0 - feature_map1) ** 2
+    diff_map = np.sqrt(np.sum(diff_map, 0) / c)
+    fig = plt.imshow(diff_map, cmap='plasma', interpolation='nearest')
+    plt.colorbar(fig)
+    
+    vec = feature_map1[:,15,26]
+    vec_tile = np.tile(vec, h * w).reshape(h, w, c).transpose(2, 0, 1)
 
-    run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name)
+    diff_map = (feature_map1 - vec_tile) ** 2
+    diff_map = np.sqrt(np.sum(diff_map, 0) / c)
+    plt.figure()
+    fig = plt.imshow(diff_map, cmap='plasma', interpolation='nearest')
+    plt.colorbar(fig)
+
+    plt.show()
+
     
 if __name__ == '__main__':
-    eval_RGBMaskNet()
+    show_feature_map_similarity()

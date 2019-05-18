@@ -21,6 +21,11 @@ def eval_OSVOSNetNet():
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
 
+    if sys.platform == 'darwin':
+        cfg_dataset = 'dataset_mac'
+    elif sys.platform == 'linux':
+        cfg_dataset = 'dataset_linux'
+
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch OSVOSNet Testing')
     parser.add_argument(
@@ -33,7 +38,7 @@ def eval_OSVOSNetNet():
         '-m', '--model-name', default='OSVOSNet', type=str,
         help='Model name for the ouput segmentation, it will create a subfolder under the out_folder.')
     parser.add_argument(
-        '-o', '--out-folder', default=cfg['paths']['dataset'], type=str, metavar='PATH',
+        '-o', '--out-folder', default=cfg['paths'][cfg_dataset], type=str, metavar='PATH',
         help='Folder for the output segmentations.')
     args = parser.parse_args()
 
@@ -60,7 +65,7 @@ def eval_OSVOSNetNet():
 
     dataset = WaterDataset_OSVOS(
         mode='eval',
-        dataset_path=cfg['paths']['dataset'], 
+        dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name
     )
     eval_loader = torch.utils.data.DataLoader(
@@ -76,7 +81,10 @@ def eval_OSVOSNetNet():
     # Load pretrained model
     if os.path.isfile(args.checkpoint):
         print('Load checkpoint \'{}\''.format(args.checkpoint))
-        checkpoint = torch.load(args.checkpoint)
+        if torch.cuda.is_available():
+            checkpoint = torch.load(args.checkpoint)
+        else:
+            checkpoint = torch.load(args.checkpoint, map_location='cpu')
         args.start_epoch = checkpoint['epoch'] + 1
         OSVOS_net.load_state_dict(checkpoint['model'])
         print('Loaded checkpoint \'{}\' (epoch {})'
@@ -85,15 +93,9 @@ def eval_OSVOSNetNet():
         raise ValueError('No checkpoint found at \'{}\''.format(args.checkpoint))
 
     # Set ouput path
-    
-    if not os.path.exists(args.out_folder):
-        os.mkdir(args.out_folder)
-    out_path = os.path.join(args.out_folder, args.model_name + '_segs')
+    out_path = os.path.join(args.out_folder, args.model_name + '_segs', args.video_name)
     if not os.path.exists(out_path):
-        os.mkdir(out_path)
-    out_path = os.path.join(out_path, args.video_name)
-    if not os.path.exists(out_path):
-        os.mkdir(out_path)
+        os.makedirs(out_path)
 
     # Start testing
     OSVOS_net.to(device).eval()
@@ -125,7 +127,7 @@ def eval_OSVOSNetNet():
             'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
             i + 1, len(eval_loader), running_time=running_time))
 
-    run_cvt_images_to_overlays(args.video_name, args.model_name)
+    run_cvt_images_to_overlays(args.video_name, args.out_folder args.model_name)
     
 if __name__ == '__main__':
     eval_OSVOSNetNet()
