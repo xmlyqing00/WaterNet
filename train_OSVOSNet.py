@@ -7,7 +7,7 @@ import torch
 from torch.utils import model_zoo
 
 from src.network import OSVOSNet
-from src.dataset import WaterDataset_OSVOS
+from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.osvos_layers import class_balanced_cross_entropy_loss
 
@@ -69,7 +69,7 @@ def train_OSVOSNet():
         }
 
     if not args.online:
-        dataset = WaterDataset_OSVOS(
+        dataset = WaterDataset_RGB(
             mode='train_offline',
             dataset_path=cfg['paths']['dataset'],
             input_size=(int(cfg['params_osvos']['input_w']), int(cfg['params_osvos']['input_h']))
@@ -81,7 +81,7 @@ def train_OSVOSNet():
             **dataset_args
         )
     else:
-        dataset = WaterDataset_OSVOS(
+        dataset = WaterDataset_RGB(
             mode='train_online',
             dataset_path=cfg['paths']['dataset'],
             input_size=(int(cfg['params_osvos']['input_w']), int(cfg['params_osvos']['input_h'])),

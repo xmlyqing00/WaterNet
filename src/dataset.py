@@ -110,11 +110,11 @@ class WaterDataset(data.Dataset):
         raise NotImplementedError
 
 
-class WaterDataset_OSVOS(WaterDataset):
+class WaterDataset_RGB(WaterDataset):
 
     def __init__(self, mode, dataset_path, input_size=None, test_case=None):
 
-        super(WaterDataset_OSVOS, self).__init__(mode, dataset_path, input_size, test_case)
+        super(WaterDataset_RGB, self).__init__(mode, dataset_path, input_size, test_case)
         self.eval_size = (640, 640)
 
     def __getitem__(self, index):

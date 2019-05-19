@@ -10,7 +10,7 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 
 from src.network import OSVOSNet
-from src.dataset import WaterDataset_OSVOS
+from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
 
@@ -63,7 +63,7 @@ def eval_OSVOSNetNet():
             'pin_memory': bool(cfg['params']['pin_memory'])
         }
 
-    dataset = WaterDataset_OSVOS(
+    dataset = WaterDataset_RGB(
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name

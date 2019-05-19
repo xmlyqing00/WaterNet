@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 from src.network import VisFeatureMapNet
-from src.dataset import WaterDataset_OSVOS
+from src.AANet import ParentNet
+from src.dataset import WaterDataset_RGB
 
 
 def show_feature_map_similarity():
@@ -59,7 +60,7 @@ def show_feature_map_similarity():
             'pin_memory': bool(cfg['params']['pin_memory'])
         }
 
-    dataset = WaterDataset_OSVOS(
+    dataset = WaterDataset_RGB(
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name
@@ -73,6 +74,7 @@ def show_feature_map_similarity():
 
     # Model
     VisFeatureMap_net = VisFeatureMapNet()
+    Parent_net = Parent_net()
 
     # Load pretrained model
     if os.path.isfile(args.checkpoint):
