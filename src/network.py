@@ -31,6 +31,15 @@ class FCNBase(nn.Module):
         raise NotImplementedError
 
 
+class AANet(FCNBase):
+
+    def __init__(self):
+
+        super(AANet, self).__init__()
+    
+    def forward(self, x):
+        return x
+
 class OSVOSNet(FCNBase):
 
     def __init__(self):
