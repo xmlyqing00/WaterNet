@@ -28,6 +28,11 @@ def train_OSVOSNet():
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
 
+    if sys.platform == 'darwin':
+        cfg_dataset = 'dataset_mac'
+    elif sys.platform == 'linux':
+        cfg_dataset = 'dataset_ubuntu'
+
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch OSVOSNet Training')
     parser.add_argument(
@@ -71,7 +76,7 @@ def train_OSVOSNet():
     if not args.online:
         dataset = WaterDataset_RGB(
             mode='train_offline',
-            dataset_path=cfg['paths']['dataset'],
+            dataset_path=cfg['paths'][cfg_dataset],
             input_size=(int(cfg['params_osvos']['input_w']), int(cfg['params_osvos']['input_h']))
         )
         train_loader = torch.utils.data.DataLoader(
@@ -83,7 +88,7 @@ def train_OSVOSNet():
     else:
         dataset = WaterDataset_RGB(
             mode='train_online',
-            dataset_path=cfg['paths']['dataset'],
+            dataset_path=cfg['paths'][cfg_dataset],
             input_size=(int(cfg['params_osvos']['input_w']), int(cfg['params_osvos']['input_h'])),
             test_case=args.video_name
         )
