@@ -15,7 +15,7 @@ class FCNBase(nn.Module):
         super(FCNBase, self).__init__()
     
     @staticmethod
-    def aligh_shape(x, desired_shape):
+    def align_shape(x, desired_shape):
         left = int((x.shape[2] - desired_shape[2]) / 2)
         top = int((x.shape[3] - desired_shape[3]) / 2)
         x = x[:,:,left:left+desired_shape[2],top:top+desired_shape[3]]

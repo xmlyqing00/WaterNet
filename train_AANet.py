@@ -142,6 +142,9 @@ def train_AANet():
     feature_net.train()
     deconv_net.train()
 
+    print(feature_net)
+    print(deconv_net)
+
     # Criterion
     criterion = torch.nn.BCELoss().to(device)
 
@@ -184,7 +187,7 @@ def train_AANet():
             img, label = sample['img'].to(device), sample['label'].to(device)
             
             feature_map, f0, f1, f2 = feature_net(img)
-            output = deconv_net(feature_map, f0, f1, f2)
+            output = deconv_net(feature_map, f0, f1, f2, img.shape)
 
             loss = criterion(output, label)
             feature_net_optimizer.zero_grad()

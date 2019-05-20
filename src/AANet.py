@@ -85,7 +85,10 @@ class DeconvNet(FCNBase):
         self.deconv4 = self.make_deconv_layer(64, 32, merge_flag=True, stride=4)
 
         # Output mask
-        self.fuse = nn.Conv2d(32, 1, kernel_size=3, padding=1)
+        self.fuse1 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
+        self.bn = nn.BatchNorm2d(32)
+        self.relu = nn.ReLU(inplace=True)
+        self.fuse2 = nn.Conv2d(32, 1, kernel_size=3, padding=1)
         self.sigmoid = nn.Sigmoid()
 
         for m in self.modules():
@@ -97,28 +100,31 @@ class DeconvNet(FCNBase):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    def forward(self, x, f0, f1, f2):
+    def forward(self, x, f0, f1, f2, input_shape):
 
         x = self.deconv1(x)
-        x = self.align_shape(x, pool2.shape)
+        x = self.align_shape(x, f2.shape)
         # print(x.shape)
         x = x + f2
 
         x = self.deconv2(x)
-        x = self.align_shape(x, pool1.shape)
+        x = self.align_shape(x, f1.shape)
         # print(x.shape)
         x = x + f1
 
         x = self.deconv3(x)
-        x = self.align_shape(x, pool0.shape)
+        x = self.align_shape(x, f0.shape)
         # print(x.shape)
         x = x + f0
 
         x = self.deconv4(x)
-        x = self.align_shape(x, input_shape)
+        x = FCNBase.align_shape(x, input_shape)
         # print(x.shape)
 
-        x = self.fuse(x)
+        x = self.fuse1(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        x = self.fuse2(x)
         x = self.sigmoid(x)
 
         return x
@@ -127,12 +133,12 @@ class DeconvNet(FCNBase):
     def make_deconv_layer(in_planes, out_planes, merge_flag=False, stride=2):
 
         layers = []
-        if merge_flag:
-            layers.append(
-                nn.Conv2d(in_planes, in_planes, kernel_size=3, stride=1, padding=1)
-            )
-            layers.append(nn.BatchNorm2d(out_planes))
-            layers.append(nn.ReLU(inplace=True))
+        # if merge_flag:
+        #    layers.append(
+        #        nn.Conv2d(in_planes, in_planes, kernel_size=3, stride=1, padding=1)
+        #    )
+        #    layers.append(nn.BatchNorm2d(in_planes))
+        #    layers.append(nn.ReLU(inplace=True))
         if stride == 4:
             layers.append(
                 nn.ConvTranspose2d(in_planes, in_planes, padding=1, output_padding=1, kernel_size=3, stride=2)
