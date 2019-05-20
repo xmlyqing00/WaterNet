@@ -122,11 +122,11 @@ class DeconvNet(FCNBase):
         # print(x.shape)
 
         x = self.fuse1(x)
-        x = self.bn(x)
-        x = self.relu(x)
-        x = self.fuse2(x)
+        # x = self.bn(x)
+        # x = self.relu(x)
+        # x = self.fuse2(x)
         x = self.sigmoid(x)
-
+        print(x.shape)
         return x
 
     @staticmethod
@@ -139,13 +139,15 @@ class DeconvNet(FCNBase):
         #    )
         #    layers.append(nn.BatchNorm2d(in_planes))
         #    layers.append(nn.ReLU(inplace=True))
-        if stride == 4:
-            layers.append(
-                nn.ConvTranspose2d(in_planes, in_planes, padding=1, output_padding=1, kernel_size=3, stride=2)
-            )
+        # if stride == 4:
+        #     layers.append(
+        #         nn.ConvTranspose2d(in_planes, in_planes, padding=1, output_padding=1, kernel_size=3, stride=2)
+        #     )
 
         layers.append(
             nn.ConvTranspose2d(in_planes, out_planes, padding=1, output_padding=1, kernel_size=3, stride=2)
         )
+        layers.append(nn.BatchNorm2d(in_planes))
+        layers.append(nn.ReLU(inplace=True))
         
         return nn.Sequential(*layers)
