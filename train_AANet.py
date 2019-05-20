@@ -6,7 +6,7 @@ import configparser
 import torch
 from torch.utils import model_zoo
 
-from src.network import OSVOSNet
+from src.AANet import FeatureNet, DeconvNet
 from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.osvos_layers import class_balanced_cross_entropy_loss
@@ -22,14 +22,14 @@ def adjust_learning_rate(optimizer, start_lr, epoch, online_mode):
         param_group['lr'] = lr
 
 
-def train_OSVOSNet():
+def train_AANet():
 
     # Paths
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
 
     # Hyper parameters
-    parser = argparse.ArgumentParser(description='PyTorch OSVOSNet Training')
+    parser = argparse.ArgumentParser(description='PyTorch AANet Training')
     parser.add_argument(
         '--online', action='store_true',
         help='If the online flag is set, model will be trained in online mode, user must provide video name.')
@@ -95,7 +95,8 @@ def train_OSVOSNet():
         )
 
     # Model
-    OSVOS_net = OSVOSNet().to(device)
+    feature_net = FeatureNet.to(device)
+    deconv_net = DeconvNet().to(device)
 
     #Optimizor
     optimizer = torch.optim.SGD(
@@ -154,7 +155,7 @@ def train_OSVOSNet():
         for param_group in optimizer.param_groups:
             lr = param_group['lr']
             break
-            
+
         print('\n=== {0} Training Epoch: [{1:4}/{2:4}]\tlr: {3:.8f} ==='.format(
             training_mode, epoch, args.total_epochs - 1, lr
         ))
@@ -202,7 +203,7 @@ def train_OSVOSNet():
             suffix = ''
             if args.online:
                 suffix = '_' + args.video_name
-            model_path = os.path.join(cfg['paths']['models'], 'cp_OSVOSNet_{0}{1}.pth.tar'.format(epoch, suffix))
+            model_path = os.path.join(cfg['paths']['models'], 'cp_AANet_{0}{1}.pth.tar'.format(epoch, suffix))
             torch.save(
                 obj={
                     'epoch': epoch,
@@ -216,4 +217,4 @@ def train_OSVOSNet():
             print('Model saved.')
 
 if __name__ == '__main__':
-    train_OSVOSNet()
+    train_AANet()

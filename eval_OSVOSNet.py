@@ -24,7 +24,7 @@ def eval_OSVOSNetNet():
     if sys.platform == 'darwin':
         cfg_dataset = 'dataset_mac'
     elif sys.platform == 'linux':
-        cfg_dataset = 'dataset_linux'
+        cfg_dataset = 'dataset_ubuntu'
 
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch OSVOSNet Testing')
