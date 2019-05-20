@@ -82,7 +82,7 @@ class DeconvNet(FCNBase):
         self.deconv1 = self.make_deconv_layer(512, 256)
         self.deconv2 = self.make_deconv_layer(256, 128, merge_flag=True)
         self.deconv3 = self.make_deconv_layer(128, 64, merge_flag=True)
-        self.deconv4 = self.make_deconv_layer(64, 32, merge_flag=True, stride=4)
+        self.deconv4 = self.make_deconv_layer(64, 1, merge_flag=True, stride=4)
 
         # Output mask
         self.fuse1 = nn.Conv2d(32, 32, kernel_size=3, padding=1)
@@ -145,7 +145,7 @@ class DeconvNet(FCNBase):
             )
 
         layers.append(
-            nn.ConvTranspose2d(in_planes, out_planes, padding=1, output_padding=1, kernel_size=5, stride=4)
+            nn.ConvTranspose2d(in_planes, out_planes, padding=1, output_padding=1, kernel_size=3, stride=2)
         )
         
         return nn.Sequential(*layers)
