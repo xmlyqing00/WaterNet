@@ -14,7 +14,7 @@ import src.transforms as my_tf
 
 class WaterDataset(data.Dataset):
 
-    def __init__(self, mode, dataset_path, input_size=None, test_case=None):
+    def __init__(self, mode, dataset_path, input_size=None, test_case=None, eval_size=None):
         
         super(WaterDataset, self).__init__()
 
@@ -25,6 +25,7 @@ class WaterDataset(data.Dataset):
         self.label_list = []
         self.verbose_flag = False
         self.online_augmentation_per_epoch = 640
+        self.eval_size = eval_size
         
         if mode == 'train_offline':
             # water_subdirs = ['ADE20K', 'buffalo0', 'canal0', 'creek0', 'lab0', 'stream0', 'stream1', 'stream2', 'river_segs']
@@ -96,6 +97,11 @@ class WaterDataset(data.Dataset):
 
             self.first_frame_label = load_image_in_PIL(first_frame_label_path).convert('L')
 
+            if self.eval_size:
+                self.origin_size = self.first_frame.size
+                self.first_frame.thumbnail(self.eval_size, Image.ANTIALIAS)
+                self.first_frame_label.thumbnail(self.eval_size, Image.ANTIALIAS)
+
         else:
             raise('Mode %s does not support in [train_offline, train_online, eval].' % mode)
 
@@ -119,10 +125,9 @@ class WaterDataset(data.Dataset):
 
 class WaterDataset_RGB(WaterDataset):
 
-    def __init__(self, mode, dataset_path, input_size=None, test_case=None):
+    def __init__(self, mode, dataset_path, input_size=None, test_case=None, eval_size=None):
 
-        super(WaterDataset_RGB, self).__init__(mode, dataset_path, input_size, test_case)
-        self.eval_size = (640, 640)
+        super(WaterDataset_RGB, self).__init__(mode, dataset_path, input_size, test_case, eval_size)
 
     def __getitem__(self, index):
         
@@ -137,15 +142,14 @@ class WaterDataset_RGB(WaterDataset):
 
         elif self.mode == 'eval':
             img = load_image_in_PIL(self.img_list[index]).convert('RGB')
-            self.origin_size = img.size
-            img.thumbnail(self.eval_size, Image.ANTIALIAS)
-            # print(self.origin_size, img.size)
+            if self.eval_size:
+                img.thumbnail(self.eval_size, Image.ANTIALIAS)
             sample = self.apply_transforms(img)
         
         return sample
 
     def resize_to_origin(self, img):
-        return img.resize(self.first_frame_label.size)
+        return img.resize(self.origin_size)
 
     def apply_transforms(self, img, label=None):
 

@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     video_name = 'stream_test'
     folder = os.path.join('/Ship01/Dataset/water/collection/test_annots/', video_name)
-    frame_name = 'original_resize_8_json'
+    frame_name = 'original_resize_13_json'
 
     label = cv2.imread(os.path.join(folder, frame_name, 'label.png'))
     label_w = cvt_object_label(label, (0, 0, 128), (255, 255, 255))
