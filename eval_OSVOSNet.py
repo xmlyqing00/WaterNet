@@ -59,8 +59,8 @@ def eval_OSVOSNetNet():
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': int(cfg['params']['num_workers']),
-            'pin_memory': bool(cfg['params']['pin_memory'])
+            'num_workers': int(cfg['params_OSVOS']['num_workers']),
+            'pin_memory': bool(cfg['params_OSVOS']['pin_memory'])
         }
 
     dataset = WaterDataset_RGB(

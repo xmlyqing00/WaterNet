@@ -39,10 +39,10 @@ def train_OSVOSNet():
         '--online', action='store_true',
         help='If the online flag is set, model will be trained in online mode, user must provide video name.')
     parser.add_argument(
-        '--total-epochs', default=int(cfg['params_osvos']['total_epochs']), type=int, metavar='N',
+        '--total-epochs', default=int(cfg['params_OSVOS']['total_epochs']), type=int, metavar='N',
         help='Number of total epochs to run (default 100).')
     parser.add_argument(
-        '--lr', default=float(cfg['params_osvos']['lr']), type=float, metavar='LR', 
+        '--lr', default=float(cfg['params_OSVOS']['lr']), type=float, metavar='LR', 
         help='Initial learning rate.')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
@@ -57,7 +57,7 @@ def train_OSVOSNet():
     assert(not args.online or (args.online and args.checkpoint))
     assert(not args.online or (args.online and args.video_name))
 
-    if args.online and args.lr == float(cfg['params_osvos']['lr']):
+    if args.online and args.lr == float(cfg['params_OSVOS']['lr']):
         args.lr /= 10
 
     # Device
@@ -69,19 +69,19 @@ def train_OSVOSNet():
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': int(cfg['params_osvos']['num_workers']),
-            'pin_memory': bool(cfg['params_osvos']['pin_memory'])
+            'num_workers': int(cfg['params_OSVOS']['num_workers']),
+            'pin_memory': bool(cfg['params_OSVOS']['pin_memory'])
         }
 
     if not args.online:
         dataset = WaterDataset_RGB(
             mode='train_offline',
             dataset_path=cfg['paths'][cfg_dataset],
-            input_size=(int(cfg['params_osvos']['input_w']), int(cfg['params_osvos']['input_h']))
+            input_size=(int(cfg['params_OSVOS']['input_w']), int(cfg['params_OSVOS']['input_h']))
         )
         train_loader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=int(cfg['params_osvos']['batch_size']),
+            batch_size=int(cfg['params_OSVOS']['batch_size']),
             shuffle=True,
             **dataset_args
         )
@@ -89,12 +89,12 @@ def train_OSVOSNet():
         dataset = WaterDataset_RGB(
             mode='train_online',
             dataset_path=cfg['paths'][cfg_dataset],
-            input_size=(int(cfg['params_osvos']['input_w']), int(cfg['params_osvos']['input_h'])),
+            input_size=(int(cfg['params_OSVOS']['input_w']), int(cfg['params_OSVOS']['input_h'])),
             test_case=args.video_name
         )
         train_loader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=int(cfg['params_osvos']['batch_size']),
+            batch_size=int(cfg['params_OSVOS']['batch_size']),
             shuffle=False,
             **dataset_args
         )

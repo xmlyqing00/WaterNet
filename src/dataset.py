@@ -91,7 +91,9 @@ class WaterDataset(data.Dataset):
             else:
                 first_frame_label_path += 'jpg'
 
+            self.first_frame = load_image_in_PIL(self.img_list[0]).convert('RGB')
             self.img_list.pop(0)
+
             self.first_frame_label = load_image_in_PIL(first_frame_label_path).convert('L')
 
         else:
@@ -102,6 +104,11 @@ class WaterDataset(data.Dataset):
             return self.online_augmentation_per_epoch
         else:
             return len(self.img_list)
+
+    def get_first_frame(self):
+        img_tf = TF.to_tensor(self.first_frame)
+        img_tf = my_tf.imagenet_normalization(img_tf)
+        return img_tf
 
     def get_first_frame_label(self):
         return TF.to_tensor(self.first_frame_label)

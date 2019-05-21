@@ -39,10 +39,10 @@ def train_RGBMaskNet():
         '--online', action='store_true',
         help='If the online flag is set, model will be trained in online mode, user must provide video name.')
     parser.add_argument(
-        '--total-epochs', default=int(cfg['params_rgbm']['total_epochs']), type=int, metavar='N',
+        '--total-epochs', default=int(cfg['params_RGBM']['total_epochs']), type=int, metavar='N',
         help='Number of total epochs to run (default 100).')
     parser.add_argument(
-        '--lr', default=float(cfg['params_rgbm']['lr']), type=float, metavar='LR', 
+        '--lr', default=float(cfg['params_RGBM']['lr']), type=float, metavar='LR', 
         help='Initial learning rate.')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
@@ -57,7 +57,7 @@ def train_RGBMaskNet():
     assert(not args.online or (args.online and args.checkpoint))
     assert(not args.online or (args.online and args.video_name))
 
-    if args.online and args.lr == float(cfg['params_rgbm']['lr']):
+    if args.online and args.lr == float(cfg['params_RGBM']['lr']):
         args.lr /= 10
 
     # Device
@@ -69,19 +69,19 @@ def train_RGBMaskNet():
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': int(cfg['params_rgbm']['num_workers']),
-            'pin_memory': bool(cfg['params_rgbm']['pin_memory'])
+            'num_workers': int(cfg['params_RGBM']['num_workers']),
+            'pin_memory': bool(cfg['params_RGBM']['pin_memory'])
         }
 
     if not args.online:
         dataset = WaterDataset_RGBMask(
             mode='train_offline',
             dataset_path=cfg['paths'][cfg_dataset],
-            input_size=(int(cfg['params_rgbm']['input_w']), int(cfg['params_rgbm']['input_h']))
+            input_size=(int(cfg['params_RGBM']['input_w']), int(cfg['params_RGBM']['input_h']))
         )
         train_loader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=int(cfg['params_rgbm']['batch_size']),
+            batch_size=int(cfg['params_RGBM']['batch_size']),
             shuffle=True,
             **dataset_args
         )
@@ -89,12 +89,12 @@ def train_RGBMaskNet():
         dataset = WaterDataset_RGBMask(
             mode='train_online',
             dataset_path=cfg['paths'][cfg_dataset],
-            input_size=(int(cfg['params_rgbm']['input_w']), int(cfg['params_rgbm']['input_h'])),
+            input_size=(int(cfg['params_RGBM']['input_w']), int(cfg['params_RGBM']['input_h'])),
             test_case=args.video_name
         )
         train_loader = torch.utils.data.DataLoader(
             dataset=dataset,
-            batch_size=int(cfg['params_rgbm']['batch_size']),
+            batch_size=int(cfg['params_RGBM']['batch_size']),
             shuffle=False,
             **dataset_args
         )
@@ -141,7 +141,7 @@ def train_RGBMaskNet():
     epoch_time = AverageMeter()
 
     # Without previous mask
-    # blank_mask = torch.zeros(int(cfg['params_rgbm']['batch_size']), 1, 300, 300)
+    # blank_mask = torch.zeros(int(cfg['params_RGBM']['batch_size']), 1, 300, 300)
     training_mode = 'Offline'
     if args.online:
         training_mode = 'Online'
