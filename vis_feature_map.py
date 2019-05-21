@@ -11,7 +11,6 @@ import torchvision.transforms.functional as TF
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from src.network import VisFeatureMapNet
 from src.AANet import FeatureNet
 from src.dataset import WaterDataset_RGB
 
@@ -56,7 +55,7 @@ def show_feature_map_similarity():
         cfg_dataset = 'dataset_ubuntu'
 
     # Hyper parameters
-    parser = argparse.ArgumentParser(description='PyTorch VisFeatureMapNet Testing')
+    parser = argparse.ArgumentParser(description='PyTorch Feature Net Visualization')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
         help='Path to latest checkpoint (default: none).')
@@ -70,8 +69,6 @@ def show_feature_map_similarity():
 
     print('Args:', args)
 
-    if args.checkpoint is None:
-        raise ValueError('Must input checkpoint path.')
     if args.video_name is None:
         raise ValueError('Must input video name.')
 
@@ -102,28 +99,28 @@ def show_feature_map_similarity():
     )
 
     # Model
-    VisFeatureMap_net = VisFeatureMapNet()
     feature_net = FeatureNet()
 
     # Load pretrained model
-    if os.path.isfile(args.checkpoint):
-        print('Load checkpoint \'{}\''.format(args.checkpoint))
-        if torch.cuda.is_available():
-            checkpoint = torch.load(args.checkpoint)
+    if args.checkpoint:
+        if os.path.isfile(args.checkpoint):
+            print('Load checkpoint \'{}\''.format(args.checkpoint))
+            if torch.cuda.is_available():
+                checkpoint = torch.load(args.checkpoint)
+            else:
+                checkpoint = torch.load(args.checkpoint, map_location='cpu')
+            args.start_epoch = checkpoint['epoch'] + 1
+            feature_net.load_state_dict(checkpoint['feature_net'])
+            print('Loaded checkpoint \'{}\' (epoch {})'
+                    .format(args.checkpoint, checkpoint['epoch']))
         else:
-            checkpoint = torch.load(args.checkpoint, map_location='cpu')
-        args.start_epoch = checkpoint['epoch'] + 1
-        VisFeatureMap_net.load_state_dict(checkpoint['model'])
-        print('Loaded checkpoint \'{}\' (epoch {})'
-                .format(args.checkpoint, checkpoint['epoch']))
-    else:
-        raise ValueError('No checkpoint found at \'{}\''.format(args.checkpoint))
-    
+            raise ValueError('No checkpoint found at \'{}\''.format(args.checkpoint))
+    else:    
+        print('Load pretrained ResNet 34.')
+        resnet34_url = 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'
+        pretrained_model = model_zoo.load_url(resnet34_url)
+        feature_net.load_pretrained_model(pretrained_model)
 
-    print('Load pretrained ResNet 34.')
-    resnet34_url = 'https://download.pytorch.org/models/resnet34-333f7ec4.pth'
-    pretrained_model = model_zoo.load_url(resnet34_url)
-    feature_net.load_pretrained_model(pretrained_model)
 
     # Set ouput path
     
@@ -132,16 +129,14 @@ def show_feature_map_similarity():
         os.makedirs(out_path)
 
     # Start testing
-    VisFeatureMap_net.to(device).eval()
     feature_net.to(device).eval()
     
     # Feature map 0
-    test_id = 45
+    test_id = 38
     sample = dataset[test_id]
 
     img = sample['img'].to(device).unsqueeze(0)     
 
-    feature_map0 = VisFeatureMap_net(img).detach().squeeze(0).cpu().numpy()
     feature_map2, t0, t1, t2 = feature_net(img)
     feature_map2 = feature_map2.detach().squeeze(0).cpu().numpy()
     # print(t0.shape)
@@ -154,13 +149,11 @@ def show_feature_map_similarity():
 
     img = sample['img'].to(device).unsqueeze(0)     
 
-    feature_map1 = VisFeatureMap_net(img).detach().squeeze(0).cpu().numpy()
     feature_map3, _, _, _ = feature_net(img)
     feature_map3 = feature_map3.detach().squeeze(0).cpu().numpy()
 
     # Position
     x, y = 0.5, 0.7
-    vis_features(feature_map0, feature_map1, x, y)
     vis_features(feature_map2, feature_map3, x, y)
     
 if __name__ == '__main__':
