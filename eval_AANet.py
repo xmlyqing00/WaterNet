@@ -16,6 +16,9 @@ from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
 
 
+def split_features(feature, mask):
+    pass
+
 def eval_AANetNet():
     
     torch.set_printoptions(precision=3, threshold=2000, sci_mode=False)
@@ -140,7 +143,11 @@ def eval_AANetNet():
     bg_mask = torch.where(first_frame_mask < 0.3, one_tensor, zero_tensor)
 
     # Set object template features
-    inds = obj_mask.nonzero().transpose(1, 0)
+    inds = obj_mask.nonzero()
+    print(inds.shape)
+    print(inds[2])
+    print(inds[3])
+    return
     obj_template_features = template_features[:, inds[2], inds[3]]
     # Size: (c, m0)
 
