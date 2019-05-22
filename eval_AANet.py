@@ -109,51 +109,97 @@ def eval_AANetNet():
     running_time = AverageMeter()
     running_endtime = time.time()
     
-    # First frame annotation
+    # Get the first frame annotation
     first_frame_mask = dataset.get_first_frame_label()
     first_frame_seg = TF.to_pil_image(first_frame_mask)
     first_frame_seg.save(os.path.join(out_path, '0.png'))
     first_frame_mask = first_frame_mask.to(device).unsqueeze(0)
 
-    # Init template features
+    # Get the first frame features
     first_frame = dataset.get_first_frame().to(device).unsqueeze(0)
+    eval_size = first_frame.shape[-2:]
     feature0, _, _, _ = feature_net(first_frame)
 
+    # Get feature size
     _, c, h, w = feature0.shape
     feature_n = h * w
+    one_tensor = torch.ones(1).to(device)
+    zero_tensor = torch.zeros(1).to(device)
 
-    print(first_frame_mask.shape)
-    first_frame_mask = F.interpolate(first_frame_mask, size=(h, w), mode='bilinear', align_corners=False)
-    print(first_frame_mask.shape)
-
-    print(first_frame_mask)
-    return
-
-    template_features = feature0.detach().reshape((c, feature_n))
-    feature_norms = template_features.norm(2, 0, keepdim=True)
+    # Transpose and normalize features    
+    template_features = feature0.detach().squeeze(0)
+    feature_norms = template_features.norm(p=2, dim=0, keepdim=True)
     template_features = template_features / feature_norms
-    # Size: (c, h * w)
+    # Size: (c, h, w)
+
+    # Split first frame annotation into object and background
+    first_frame_mask = F.interpolate(first_frame_mask, size=(h, w), mode='bilinear', align_corners=False).detach()
+    obj_mask = torch.where(first_frame_mask > 0.7, one_tensor, zero_tensor)
+    bg_mask = torch.where(first_frame_mask < 0.3, one_tensor, zero_tensor)
+
+    # Set object template features
+    inds = obj_mask.nonzero().transpose(1, 0)
+    obj_template_features = template_features[:, inds[2], inds[3]]
+    # Size: (c, m0)
+
+    # Set background template features
+    inds = bg_mask.nonzero().transpose(1, 0)
+    bg_template_features = template_features[:, inds[2], inds[3]]
+    # Size: (c, m1)
+
+    # print(bg_template_features.shape)
+    # print(obj_template_features.shape)
+    # print('obj templates', obj_template_features)
+    # print('bg templates', bg_template_features)
 
     for i, sample in enumerate(eval_loader):
 
         img = sample['img'].to(device)     
 
         feature_map, f0, f1, f2 = feature_net(img)
-        output = deconv_net(feature_map, f0, f1, f2, img.shape)
+        output = deconv_net(feature_map, f0, f1, f2, img.shape).detach()
 
         cur_feature = feature_map.detach().reshape((c, feature_n)).transpose(0, 1)
-        feature_norms = cur_feature.norm(2, 1, keepdim=True)
-        cur_feature /= feature_norms
-        # Size: h*w, c
+        feature_norms = cur_feature.norm(p=2, dim=1, keepdim=True)
+        cur_feature /= feature_norms # Size: (h*w, c)
 
-        similarity_scores = cur_feature.matmul(template_features)
-        print(similarity_scores)
-        topk_scores = similarity_scores.topk(20, 1, largest=True)
-        print(topk_scores)
+        similarity_scores_obj = cur_feature.matmul(obj_template_features) # Size: (h*w, m0)
+        similarity_scores_bg = cur_feature.matmul(bg_template_features) # Size: (h*w, m1)
+        topk_scores_obj = similarity_scores_obj.topk(k=20, dim=1, largest=True)
+        topk_scores_bg = similarity_scores_bg.topk(k=20, dim=1, largest=True)
+        avg_scores_obj = topk_scores_obj.values.mean(dim=1).reshape(1, 1, h, w)
+        avg_scores_bg = topk_scores_bg.values.mean(dim=1).reshape(1, 1, h, w)
 
-        # seg0 = TF.to_pil_image(output.detach().squeeze(0).cpu())
+        scores_obj = F.interpolate(avg_scores_obj, img.shape[2:], mode='bilinear', align_corners=False)
+        scores_bg = F.interpolate(avg_scores_bg, img.shape[2:], mode='bilinear', align_corners=False)
+        scores = torch.cat((scores_bg, scores_obj), dim=1)
+        adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach()
+        # print('obj', similarity_scores_obj)
+        # print('bg', similarity_scores_bg)
+        # print('obj', topk_scores_obj)
+        # print('bg', topk_scores_bg)
+        # print(scores)
+
+        # print(avg_scores_obj)
+
+        final_seg = (output + adaption_seg) / 2
+        final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor)
+
+        # print('output', output)
+        # print('adapt', adaption_seg)
+        # print('final', final_seg)
+
+        seg0 = TF.to_pil_image(output.squeeze(0).cpu())
         # seg0 = dataset.resize_to_origin(seg0)
-        # seg0.save(os.path.join(out_path, 'seg0_%d.png' % (i + 1)))
+        seg0.save(os.path.join(out_path, 'seg0_%d.png' % (i + 1)))
+
+        seg1 = TF.to_pil_image(adaption_seg.squeeze(0).cpu())
+        # seg1 = dataset.resize_to_origin(seg1)
+        seg1.save(os.path.join(out_path, 'seg1_%d.png' % (i + 1)))
+
+        final_seg = TF.to_pil_image(final_seg.squeeze(0).cpu())
+        # final_seg = dataset.resize_to_origin(final_seg)
+        final_seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
 
         running_time.update(time.time() - running_endtime)
         running_endtime = time.time()
@@ -162,7 +208,8 @@ def eval_AANetNet():
             'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
             i + 1, len(eval_loader), running_time=running_time))
 
-    # run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name)
+
+    run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name, eval_size)
     
 if __name__ == '__main__':
     eval_AANetNet()

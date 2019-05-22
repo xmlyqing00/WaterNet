@@ -38,7 +38,8 @@ def cvt_images_to_overlays(image_folder,
                            output_folder, 
                            label_color=[255, 255, 255],
                            stride=1,
-                           frame_st=0):
+                           frame_st=0,
+                           eval_size=None):
 
     image_list = os.listdir(image_folder)
     mask_list = os.listdir(mask_folder)
@@ -59,7 +60,8 @@ def cvt_images_to_overlays(image_folder,
         
         image_path = os.path.join(image_folder, image_list[image_idx+frame_st])
         image = cv2.imread(image_path)
-        # image = cv2.resize(image, None, None, 0.5, 0.5)
+        if eval_size:
+            image = cv2.resize(image, (eval_size[1], eval_size[0]), None)
 
         mask_path = os.path.join(mask_folder, mask_list[image_idx])
         mask = cv2.imread(mask_path)
@@ -75,7 +77,7 @@ def cvt_images_to_overlays(image_folder,
         print("Add mask to image:", image_idx, output_path)
 
 
-def run_cvt_images_to_overlays(video_name, root_folder, model_name='RGBMaskNet'):
+def run_cvt_images_to_overlays(video_name, root_folder, model_name='RGBMaskNet', eval_size=None):
 
     image_folder = os.path.join(root_folder, 'test_videos/', video_name)
     mask_folder = os.path.join(root_folder, model_name + '_segs', video_name)
@@ -84,7 +86,8 @@ def run_cvt_images_to_overlays(video_name, root_folder, model_name='RGBMaskNet')
     stride = 1
     frame_st = 0
 
-    cvt_images_to_overlays(image_folder, mask_folder, output_folder, label_color, stride, frame_st)
+    # eval_size: (h, w)
+    cvt_images_to_overlays(image_folder, mask_folder, output_folder, label_color, stride, frame_st, eval_size)
 
 def run_add_mask_to_image():
 
