@@ -114,6 +114,8 @@ def eval_AANetNet():
     first_frame_seg = TF.to_pil_image(first_frame_mask)
     first_frame_seg.save(os.path.join(out_path, '0.png'))
     first_frame_mask = first_frame_mask.to(device).unsqueeze(0)
+    prev_frame_mask = first_frame_mask # Size (1, 1, h, w)
+    print(prev_frame_mask.shape)
 
     # Get the first frame features
     first_frame = dataset.get_first_frame().to(device).unsqueeze(0)
