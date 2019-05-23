@@ -15,9 +15,45 @@ from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
 
+device = torch.device('cpu')
+if torch.cuda.is_available():
+    device = torch.device('cuda')
 
-def split_features(feature, mask):
-    pass
+one_tensor = torch.ones(1).to(device)
+zero_tensor = torch.zeros(1).to(device)
+
+
+def split_mask(mask, split_thres = 0.7):
+
+    obj_mask = torch.where(mask > split_thres, one_tensor, zero_tensor)
+    bg_mask = torch.where(mask < (1-split_thres), one_tensor, zero_tensor)
+
+    return obj_mask, bg_mask
+
+def split_features(feature_map, mask):
+
+    obj_mask, bg_mask = split_mask(mask)
+
+    # Set object template features
+    inds = obj_mask.nonzero().transpose(1, 0)
+    obj_features = feature_map[:, inds[2], inds[3]]
+    # Size: (c, m0)
+
+    # Set background template features
+    inds = bg_mask.nonzero().transpose(1, 0)
+    bg_features = feature_map[:, inds[2], inds[3]]
+    # Size: (c, m1)
+
+    return obj_features, bg_features
+
+def compute_similarity(cur_feature, template_features, shape_s, shape_l, topk=20):
+
+    similarity_scores = cur_feature.matmul(template_features) # Size: (h*w, m0)
+    topk_scores = similarity_scores.topk(k=topk, dim=1, largest=True)
+    avg_scores = topk_scores.values.mean(dim=1).reshape(1, 1, shape_s[0], shape_s[1])
+    scores = F.interpolate(avg_scores, shape_l, mode='bilinear', align_corners=False)
+
+    return scores
 
 def eval_AANetNet():
     
@@ -56,10 +92,6 @@ def eval_AANetNet():
         raise ValueError('Must input video name.')
 
     water_thres = 0.5
-
-    device = torch.device('cpu')
-    if torch.cuda.is_available():
-        device = torch.device('cuda')
 
     # Dataset
     dataset_args = {}
@@ -117,49 +149,30 @@ def eval_AANetNet():
     first_frame_seg = TF.to_pil_image(first_frame_mask)
     first_frame_seg.save(os.path.join(out_path, '0.png'))
     first_frame_mask = first_frame_mask.to(device).unsqueeze(0)
-    prev_frame_mask = first_frame_mask # Size (1, 1, h, w)
-    print(prev_frame_mask.shape)
 
     # Get the first frame features
     first_frame = dataset.get_first_frame().to(device).unsqueeze(0)
     eval_size = first_frame.shape[-2:]
     feature0, _, _, _ = feature_net(first_frame)
 
-    # Get feature size
-    _, c, h, w = feature0.shape
+    # Normalize features. Size: (c, h, w)
+    feature_map = feature0.detach().squeeze(0)
+    feature_norms = feature_map.norm(p=2, dim=0, keepdim=True)
+    feature_map = feature_map / feature_norms
+    c, h, w = feature_map.shape
     feature_n = h * w
-    one_tensor = torch.ones(1).to(device)
-    zero_tensor = torch.zeros(1).to(device)
 
-    # Transpose and normalize features    
-    template_features = feature0.detach().squeeze(0)
-    feature_norms = template_features.norm(p=2, dim=0, keepdim=True)
-    template_features = template_features / feature_norms
-    # Size: (c, h, w)
-
-    # Split first frame annotation into object and background
+    # Get template fetures. Size: (c, m0), (c, m1)
     first_frame_mask = F.interpolate(first_frame_mask, size=(h, w), mode='bilinear', align_corners=False).detach()
-    obj_mask = torch.where(first_frame_mask > 0.7, one_tensor, zero_tensor)
-    bg_mask = torch.where(first_frame_mask < 0.3, one_tensor, zero_tensor)
+    prev_frame_mask = first_frame_mask # Size (1, 1, h, w)
+    template_features_obj, template_features_bg = split_features(feature_map, first_frame_mask)
+    m0 = template_features_obj.shape[1]
+    m1 = template_features_obj.shape[1]
 
-    # Set object template features
-    inds = obj_mask.nonzero()
-    print(inds.shape)
-    print(inds[2])
-    print(inds[3])
-    return
-    obj_template_features = template_features[:, inds[2], inds[3]]
-    # Size: (c, m0)
-
-    # Set background template features
-    inds = bg_mask.nonzero().transpose(1, 0)
-    bg_template_features = template_features[:, inds[2], inds[3]]
-    # Size: (c, m1)
-
-    # print(bg_template_features.shape)
-    # print(obj_template_features.shape)
-    # print('obj templates', obj_template_features)
-    # print('bg templates', bg_template_features)
+    print(template_features_bg.shape)
+    print(template_features_obj.shape)
+    # print('obj templates', template_features_obj)
+    # print('bg templates', template_features_bg)
 
     for i, sample in enumerate(eval_loader):
 
@@ -171,16 +184,9 @@ def eval_AANetNet():
         cur_feature = feature_map.detach().reshape((c, feature_n)).transpose(0, 1)
         feature_norms = cur_feature.norm(p=2, dim=1, keepdim=True)
         cur_feature /= feature_norms # Size: (h*w, c)
-
-        similarity_scores_obj = cur_feature.matmul(obj_template_features) # Size: (h*w, m0)
-        similarity_scores_bg = cur_feature.matmul(bg_template_features) # Size: (h*w, m1)
-        topk_scores_obj = similarity_scores_obj.topk(k=20, dim=1, largest=True)
-        topk_scores_bg = similarity_scores_bg.topk(k=20, dim=1, largest=True)
-        avg_scores_obj = topk_scores_obj.values.mean(dim=1).reshape(1, 1, h, w)
-        avg_scores_bg = topk_scores_bg.values.mean(dim=1).reshape(1, 1, h, w)
-
-        scores_obj = F.interpolate(avg_scores_obj, img.shape[2:], mode='bilinear', align_corners=False)
-        scores_bg = F.interpolate(avg_scores_bg, img.shape[2:], mode='bilinear', align_corners=False)
+        
+        scores_obj = compute_similarity(cur_feature, template_features_obj, (h,w), img.shape[2:])
+        scores_bg = compute_similarity(cur_feature, template_features_bg, (h,w), img.shape[2:])
         scores = torch.cat((scores_bg, scores_obj), dim=1)
         adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach()
         # print('obj', similarity_scores_obj)
@@ -199,15 +205,12 @@ def eval_AANetNet():
         # print('final', final_seg)
 
         seg0 = TF.to_pil_image(output.squeeze(0).cpu())
-        # seg0 = dataset.resize_to_origin(seg0)
         seg0.save(os.path.join(out_path, 'seg0_%d.png' % (i + 1)))
 
         seg1 = TF.to_pil_image(adaption_seg.squeeze(0).cpu())
-        # seg1 = dataset.resize_to_origin(seg1)
         seg1.save(os.path.join(out_path, 'seg1_%d.png' % (i + 1)))
 
         final_seg = TF.to_pil_image(final_seg.squeeze(0).cpu())
-        # final_seg = dataset.resize_to_origin(final_seg)
         final_seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
 
         running_time.update(time.time() - running_endtime)
