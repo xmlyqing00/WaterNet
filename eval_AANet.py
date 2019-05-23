@@ -48,6 +48,11 @@ def split_features(feature_map, mask, split_thres=0.7, erosion_iters=0):
     # Set object template features
     inds = obj_mask.nonzero().transpose(1, 0)
     obj_features = feature_map[:, inds[2], inds[3]]
+    print('old', obj_features.shape)
+    print(obj_features)
+    obj_features = feature_map[obj_mask]
+    print('new', obj_features.shape)
+    print(obj_features)
     # Size: (c, m0)
 
     # Set background template features
@@ -181,6 +186,8 @@ def eval_AANetNet():
     template_features_obj, template_features_bg = split_features(feature_map, pre_frame_mask)
     m0 = template_features_obj.shape[1]
     m1 = template_features_obj.shape[1]
+
+    return
 
     print(template_features_bg.shape)
     print(template_features_obj.shape)
