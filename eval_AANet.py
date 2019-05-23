@@ -9,6 +9,7 @@ import torch
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
 from PIL import Image
+from scipy import ndimage
 
 from src.AANet import FeatureNet, DeconvNet
 from src.dataset import WaterDataset_RGB
@@ -23,16 +24,26 @@ one_tensor = torch.ones(1).to(device)
 zero_tensor = torch.zeros(1).to(device)
 
 
-def split_mask(mask, split_thres = 0.7):
+def split_mask(mask, split_thres=0.7, erosion_iters=0):
 
     obj_mask = torch.where(mask > split_thres, one_tensor, zero_tensor)
     bg_mask = torch.where(mask < (1-split_thres), one_tensor, zero_tensor)
 
+    if erosion_iters > 0:
+        obj_mask = obj_mask.squeeze().cpu().numpy()
+        bg_mask = bg_mask.squeeze().cpu().numpy()
+        
+        center_mask_obj = ndimage.binary_erosion(obj_mask, iterations=erosion_iters).astype(np.float32)
+        center_mask_bg = ndimage.binary_erosion(bg_mask, iterations=erosion_iters).astype(np.float32)
+
+        obj_mask = torch.tensor(center_mask_obj, device=device).unsqueeze(0).unsqueeze(0)
+        bg_mask = torch.tensor(center_mask_bg, device=device).unsqueeze(0).unsqueeze(0)
+
     return obj_mask, bg_mask
 
-def split_features(feature_map, mask):
+def split_features(feature_map, mask, split_thres=0.7, erosion_iters=0):
 
-    obj_mask, bg_mask = split_mask(mask)
+    obj_mask, bg_mask = split_mask(mask, split_thres, erosion_iters)
 
     # Set object template features
     inds = obj_mask.nonzero().transpose(1, 0)
@@ -46,6 +57,7 @@ def split_features(feature_map, mask):
 
     return obj_features, bg_features
 
+
 def compute_similarity(cur_feature, template_features, shape_s, shape_l, topk=20):
 
     similarity_scores = cur_feature.matmul(template_features) # Size: (h*w, m0)
@@ -57,7 +69,8 @@ def compute_similarity(cur_feature, template_features, shape_s, shape_l, topk=20
 
 def eval_AANetNet():
     
-    torch.set_printoptions(precision=3, threshold=2000, sci_mode=False)
+    torch.set_printoptions(precision=3, threshold=2000, linewidth=160, sci_mode=False)
+    np.set_printoptions(precision=3, threshold=2000, linewidth=160, suppress=False)
 
     # Paths
     cfg = configparser.ConfigParser()
@@ -163,9 +176,9 @@ def eval_AANetNet():
     feature_n = h * w
 
     # Get template fetures. Size: (c, m0), (c, m1)
-    first_frame_mask = F.interpolate(first_frame_mask, size=(h, w), mode='bilinear', align_corners=False).detach()
-    prev_frame_mask = first_frame_mask # Size (1, 1, h, w)
-    template_features_obj, template_features_bg = split_features(feature_map, first_frame_mask)
+    pre_frame_mask = F.interpolate(first_frame_mask, size=(h, w), mode='bilinear', align_corners=False).detach()
+    # pre_frame_mask Size (1, 1, h, w)
+    template_features_obj, template_features_bg = split_features(feature_map, pre_frame_mask)
     m0 = template_features_obj.shape[1]
     m1 = template_features_obj.shape[1]
 
@@ -179,26 +192,32 @@ def eval_AANetNet():
         img = sample['img'].to(device)     
 
         feature_map, f0, f1, f2 = feature_net(img)
-        output = deconv_net(feature_map, f0, f1, f2, img.shape).detach()
+        output = deconv_net(feature_map, f0, f1, f2, img.shape).detach() # Size: (1, 1, h, w)
 
-        cur_feature = feature_map.detach().reshape((c, feature_n)).transpose(0, 1)
+        # cur_feature = feature_map.detach().reshape((c, feature_n)).transpose(0, 1)
+        cur_feature = feature_map.detach().squeeze(0)
         feature_norms = cur_feature.norm(p=2, dim=1, keepdim=True)
         cur_feature /= feature_norms # Size: (h*w, c)
-        
+
+        # Add center features to template features
+        center_features_obj, center_features_bg = split_features(cur_feature, pre_frame_mask, erosion_iters=5)
+        print(center_features_obj.shape, center_features_bg.shape)
+        template_features_bg = torch.cat((template_features_bg, center_features_bg), dim=1)
+        template_features_obj = torch.cat((template_features_obj, center_features_obj), dim=1)
+
+        print(template_features_bg.shape, template_features_obj.shape)
+        return
+
         scores_obj = compute_similarity(cur_feature, template_features_obj, (h,w), img.shape[2:])
         scores_bg = compute_similarity(cur_feature, template_features_bg, (h,w), img.shape[2:])
         scores = torch.cat((scores_bg, scores_obj), dim=1)
-        adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach()
-        # print('obj', similarity_scores_obj)
-        # print('bg', similarity_scores_bg)
-        # print('obj', topk_scores_obj)
-        # print('bg', topk_scores_bg)
-        # print(scores)
+        adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
 
         # print(avg_scores_obj)
 
         final_seg = (output + adaption_seg) / 2
-        final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor)
+        final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
+        pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
 
         # print('output', output)
         # print('adapt', adaption_seg)
