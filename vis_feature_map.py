@@ -19,10 +19,12 @@ def vis_features(feature_map0, feature_map1, x, y):
 
     # Feature diff
     c, h, w = feature_map0.shape
-    print(c, h, w)
+    print('c h w:', c, h, w)
 
     x = int(x * w)
     y = int(y * h)
+
+    print('x y:', x, y)
 
     fig, axes = plt.subplots(nrows=1, ncols=2)
 
@@ -79,23 +81,11 @@ def show_feature_map_similarity():
         device = torch.device('cuda')
 
     # Dataset
-    dataset_args = {}
-    if torch.cuda.is_available():
-        dataset_args = {
-            'num_workers': int(cfg['params']['num_workers']),
-            'pin_memory': bool(cfg['params']['pin_memory'])
-        }
-
     dataset = WaterDataset_RGB(
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
-        test_case=args.video_name
-    )
-    eval_loader = torch.utils.data.DataLoader(
-        dataset=dataset,
-        batch_size=1,
-        shuffle=False,
-        **dataset_args
+        test_case=args.video_name,
+        eval_size=(640, 640)
     )
 
     # Model
@@ -132,29 +122,26 @@ def show_feature_map_similarity():
     feature_net.to(device).eval()
     
     # Feature map 0
-    test_id = 38
+    test_id = 28
     sample = dataset[test_id]
 
-    img = sample['img'].to(device).unsqueeze(0)     
-
-    feature_map2, t0, t1, t2 = feature_net(img)
-    feature_map2 = feature_map2.detach().squeeze(0).cpu().numpy()
-    # print(t0.shape)
-    # print(t1.shape)
-    # print(t2.shape)
+    with torch.no_grad():
+        img = sample['img'].to(device).unsqueeze(0)
+        feature_map0, _, _, _ = feature_net(img)
+        feature_map0 = feature_map0.detach().squeeze(0).cpu().numpy()
 
     # Feature map 1
     test_id = test_id + 1
     sample = dataset[test_id]
 
-    img = sample['img'].to(device).unsqueeze(0)     
-
-    feature_map3, _, _, _ = feature_net(img)
-    feature_map3 = feature_map3.detach().squeeze(0).cpu().numpy()
+    with torch.no_grad():
+        img = sample['img'].to(device).unsqueeze(0)     
+        feature_map1, _, _, _ = feature_net(img)
+        feature_map1 = feature_map1.detach().squeeze(0).cpu().numpy()
 
     # Position
     x, y = 0.5, 0.7
-    vis_features(feature_map2, feature_map3, x, y)
+    vis_features(feature_map0, feature_map1, x, y)
     
 if __name__ == '__main__':
     show_feature_map_similarity()

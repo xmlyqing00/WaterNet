@@ -35,6 +35,10 @@ def split_mask(mask, split_thres=0.7, erosion_iters=0):
         
         center_mask_obj = ndimage.binary_erosion(obj_mask, iterations=erosion_iters).astype(np.float32)
         center_mask_bg = ndimage.binary_erosion(bg_mask, iterations=erosion_iters).astype(np.float32)
+        
+        # Debug
+        # print('obj_mask', obj_mask)
+        # print('center_mask_obj', center_mask_obj)
 
         obj_mask = torch.tensor(center_mask_obj, device=device).unsqueeze(0).unsqueeze(0)
         bg_mask = torch.tensor(center_mask_bg, device=device).unsqueeze(0).unsqueeze(0)
@@ -65,13 +69,12 @@ def compute_similarity(cur_feature, template_features, shape_s, shape_l, topk=20
     avg_scores = topk_scores.values.mean(dim=1).reshape(1, 1, shape_s[0], shape_s[1])
     scores = F.interpolate(avg_scores, shape_l, mode='bilinear', align_corners=False)
 
-    # print(topk_scores)
     return scores
 
 def eval_AANetNet():
     
-    torch.set_printoptions(precision=3, threshold=2000, linewidth=160, sci_mode=False)
-    np.set_printoptions(precision=3, threshold=2000, linewidth=160, suppress=False)
+    torch.set_printoptions(precision=3, threshold=3000, linewidth=160, sci_mode=False)
+    np.set_printoptions(precision=3, threshold=3000, linewidth=160, suppress=False)
 
     # Paths
     cfg = configparser.ConfigParser()
@@ -119,7 +122,7 @@ def eval_AANetNet():
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name,
-        eval_size=(640, 640)
+        # eval_size=(640, 640)
     )
     eval_loader = torch.utils.data.DataLoader(
         dataset=dataset,
@@ -176,6 +179,8 @@ def eval_AANetNet():
     c, h, w = feature_map.shape
     feature_n = h * w
 
+    print('c', c, 'h', h, 'w', w)
+
     # Get template fetures. Size: (c, m0), (c, m1)
     pre_frame_mask = F.interpolate(first_frame_mask, size=(h, w), mode='bilinear', align_corners=False).detach()
     # pre_frame_mask Size (1, 1, h, w)
@@ -185,57 +190,58 @@ def eval_AANetNet():
 
     print('Init features', template_features_obj.shape, template_features_bg.shape)
 
-    for i, sample in enumerate(eval_loader):
+    with torch.no_grad():
+        for i, sample in enumerate(eval_loader):
 
-        img = sample['img'].to(device)     
+            img = sample['img'].to(device)     
 
-        feature_map, f0, f1, f2 = feature_net(img)
-        output = deconv_net(feature_map, f0, f1, f2, img.shape).detach() # Size: (1, 1, h, w)
+            feature_map, f0, f1, f2 = feature_net(img)
+            output = deconv_net(feature_map, f0, f1, f2, img.shape).detach() # Size: (1, 1, h, w)
 
-        feature_map = feature_map.detach().squeeze(0)
-        feature_map /= feature_map.norm(p=2, dim=0, keepdim=True) # Size: (c, h, w)
+            feature_map = feature_map.detach().squeeze(0)
+            feature_map /= feature_map.norm(p=2, dim=0, keepdim=True) # Size: (c, h, w)
 
-        # Add center features to template features
-        center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=6)
-        print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
-        template_features_obj = torch.cat((template_features_obj, center_features_obj), dim=1)
-        template_features_bg = torch.cat((template_features_bg, center_features_bg), dim=1)
-        print('Added conf features:\t', template_features_obj.shape, template_features_bg.shape)
+            # Add center features to template features
+            center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=4)
+            print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
+            template_features_obj = torch.cat((template_features_obj, center_features_obj), dim=1)
+            template_features_bg = torch.cat((template_features_bg, center_features_bg), dim=1)
+            print('Added conf features:\t', template_features_obj.shape, template_features_bg.shape)
 
-        cur_feature = feature_map.reshape((c, feature_n)).transpose(0, 1)
-        scores_obj = compute_similarity(cur_feature, template_features_obj, (h,w), img.shape[2:])
-        scores_bg = compute_similarity(cur_feature, template_features_bg, (h,w), img.shape[2:])
-        scores = torch.cat((scores_bg, scores_obj), dim=1)
-        adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
+            cur_feature = feature_map.reshape((c, feature_n)).transpose(0, 1)
+            scores_obj = compute_similarity(cur_feature, template_features_obj, (h,w), img.shape[2:])
+            scores_bg = compute_similarity(cur_feature, template_features_bg, (h,w), img.shape[2:])
+            scores = torch.cat((scores_bg, scores_obj), dim=1)
+            adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
 
-        final_seg = (output + adaption_seg) / 2
-        final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
-        pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
+            final_seg = (output + adaption_seg) / 2
+            final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
+            pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
 
-        # Update templates
-        template_features_obj = template_features_obj[:,:m0]
-        template_features_bg = template_features_bg[:,:m1]
-        print('Removed conf features:\t', template_features_obj.shape, template_features_bg.shape)
+            # Update templates
+            template_features_obj = template_features_obj[:,:m0]
+            template_features_bg = template_features_bg[:,:m1]
+            print('Removed conf features:\t', template_features_obj.shape, template_features_bg.shape)
 
-        # print('output', output)
-        # print('adapt', adaption_seg)
-        # print('final', final_seg)
+            # print('output', output)
+            # print('adapt', adaption_seg)
+            # print('final', final_seg)
 
-        seg0 = TF.to_pil_image(output.squeeze(0).cpu())
-        seg0.save(os.path.join(out_path, 'seg0_%d.png' % (i + 1)))
+            seg0 = TF.to_pil_image(output.squeeze(0).cpu())
+            seg0.save(os.path.join(out_path, 'seg0_%d.png' % (i + 1)))
 
-        seg1 = TF.to_pil_image(adaption_seg.squeeze(0).cpu())
-        seg1.save(os.path.join(out_path, 'seg1_%d.png' % (i + 1)))
+            seg1 = TF.to_pil_image(adaption_seg.squeeze(0).cpu())
+            seg1.save(os.path.join(out_path, 'seg1_%d.png' % (i + 1)))
 
-        final_seg = TF.to_pil_image(final_seg.squeeze(0).cpu())
-        final_seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
+            final_seg = TF.to_pil_image(final_seg.squeeze(0).cpu())
+            final_seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
 
-        running_time.update(time.time() - running_endtime)
-        running_endtime = time.time()
+            running_time.update(time.time() - running_endtime)
+            running_endtime = time.time()
 
-        print('Segment: [{0:4}/{1:4}]\t'
-            'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
-            i + 1, len(eval_loader), running_time=running_time))
+            print('Segment: [{0:4}/{1:4}]\t'
+                'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
+                i + 1, len(eval_loader), running_time=running_time))
 
 
     run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name, eval_size)
