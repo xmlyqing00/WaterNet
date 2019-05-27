@@ -185,8 +185,12 @@ def eval_AANetNet():
     pre_frame_mask = F.interpolate(first_frame_mask, size=(h, w), mode='bilinear', align_corners=False).detach()
     # pre_frame_mask Size (1, 1, h, w)
     template_features_obj, template_features_bg = split_features(feature_map, pre_frame_mask)
-    m0 = template_features_obj.shape[1]
-    m1 = template_features_bg.shape[1]
+    m0_first = template_features_obj.shape[1]
+    m1_first = template_features_bg.shape[1]
+
+    m0, m1 = m0_first, m1_first
+
+    
 
     print('Init features', template_features_obj.shape, template_features_bg.shape)
 
@@ -202,7 +206,7 @@ def eval_AANetNet():
             feature_map /= feature_map.norm(p=2, dim=0, keepdim=True) # Size: (c, h, w)
 
             # Add center features to template features
-            center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=4)
+            center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r0']))
             print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
             template_features_obj = torch.cat((template_features_obj, center_features_obj), dim=1)
             template_features_bg = torch.cat((template_features_bg, center_features_bg), dim=1)
@@ -218,10 +222,13 @@ def eval_AANetNet():
             final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
             pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
 
-            # Update templates
+            # Remove high-confidence templates
             template_features_obj = template_features_obj[:,:m0]
             template_features_bg = template_features_bg[:,:m1]
-            print('Removed conf features:\t', template_features_obj.shape, template_features_bg.shape)
+            print('Removed high-conf features:\t', template_features_obj.shape, template_features_bg.shape)
+                
+            if i >= 10:
+                
 
             # print('output', output)
             # print('adapt', adaption_seg)
