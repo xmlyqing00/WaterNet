@@ -15,6 +15,7 @@ from src.AANet import FeatureNet, DeconvNet
 from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
+from src.utils import load_image_in_PIL, iou_tensor
 
 device = torch.device('cpu')
 if torch.cuda.is_available():
@@ -94,8 +95,11 @@ def eval_AANetNet():
         '--no-conf', action='store_true',
         help='Evaluate the video without high-confidence features updating templates.')
     parser.add_argument(
-        '--no-AA', action='store_true',
-        help='Evaluate the video without temporally updating templates.')
+        '--no-aa', action='store_true',
+        help='Evaluate the video without appearance-adaptive branch.')
+    parser.add_argument(
+        '-b', '--benchmark', action='store_true',
+        help='Evaluate the video with groundtruth.')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
         help='Path to latest checkpoint (default: none).')
@@ -205,6 +209,12 @@ def eval_AANetNet():
 
     keep_features_n = 7
 
+    if args.benchmark:
+        gt_folder = os.path.join(cfg['paths'][cfg_dataset], 'test_annots', args.video_name)
+        gt_list = os.listdir(gt_folder)
+        gt_list.sort(key = lambda x: (len(x), x))
+        gt_list.pop(0)
+
     with torch.no_grad():
         for i, sample in enumerate(eval_loader):
 
@@ -216,59 +226,80 @@ def eval_AANetNet():
             feature_map = feature_map.detach().squeeze(0)
             feature_map /= feature_map.norm(p=2, dim=0, keepdim=True) # Size: (c, h, w)
 
-            # Add center features to template features
-            center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r0']))
-            print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
-            feature_templates_obj = torch.cat((feature_templates_obj, center_features_obj), dim=1)
-            feature_templates_bg = torch.cat((feature_templates_bg, center_features_bg), dim=1)
-            print('Added conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
+            if not args.no_conf:
+                # Add center features to template features
+                center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r0']))
+                print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
+                feature_templates_obj = torch.cat((feature_templates_obj, center_features_obj), dim=1)
+                feature_templates_bg = torch.cat((feature_templates_bg, center_features_bg), dim=1)
+                print('Added conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
+            
+            if not args.no_aa:
+                cur_feature = feature_map.reshape((c, feature_n)).transpose(0, 1)
+                scores_obj = compute_similarity(cur_feature, feature_templates_obj, (h,w), img.shape[2:])
+                scores_bg = compute_similarity(cur_feature, feature_templates_bg, (h,w), img.shape[2:])
+                scores = torch.cat((scores_bg, scores_obj), dim=1)
+                adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
 
-            cur_feature = feature_map.reshape((c, feature_n)).transpose(0, 1)
-            scores_obj = compute_similarity(cur_feature, feature_templates_obj, (h,w), img.shape[2:])
-            scores_bg = compute_similarity(cur_feature, feature_templates_bg, (h,w), img.shape[2:])
-            scores = torch.cat((scores_bg, scores_obj), dim=1)
-            adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
+                final_seg = (output + adaption_seg) / 2
+                final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
+                pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
+            else:
+                final_seg = output
+                final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
+                pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
+            
+            if not args.no_conf:
+                # Remove high-confidence templates
+                feature_templates_obj = feature_templates_obj[:,:m0]
+                feature_templates_bg = feature_templates_bg[:,:m1]
+                print('Removed high-conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
+            
+            if not args.no_temporal:
+                # Remove previous feature templates
+                if i > keep_features_n:
+                    j = i - keep_features_n
+                    feature_templates_obj = torch.cat(feature_templates_obj[:,:m0_first], feature_templates_obj[:,m0_first + templates_n[j]:], dim=1)
+                    feature_templates_bg = torch.cat(feature_templates_bg[:,:m1_first], feature_templates_obj[:,m1_first + templates_n[j]:], dim=1)
 
-            final_seg = (output + adaption_seg) / 2
-            final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
-            pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
+                # Add current features to template features
+                cur_features_obj, cur_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r1']))
+                print('cur features:\t', cur_features_obj.shape, cur_features_bg.shape)
+                feature_templates_obj = torch.cat((feature_templates_obj, cur_features_obj), dim=1)
+                feature_templates_bg = torch.cat((feature_templates_bg, cur_features_bg), dim=1)
+                m0_cur, m1_cur = cur_features_obj.shape[1], cur_features_bg.shape[1]
+                m0, m1 = feature_templates_obj.shape[1], feature_templates_bg.shape[1]
 
-            # Remove high-confidence templates
-            feature_templates_obj = feature_templates_obj[:,:m0]
-            feature_templates_bg = feature_templates_bg[:,:m1]
-            print('Removed high-conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
-                
-            # Remove previous feature templates
-            if i > keep_features_n:
-                j = i - keep_features_n
-                feature_templates_obj = torch.cat(feature_templates_obj[:,:m0_first], feature_templates_obj[:,m0_first + templates_n[j]:], dim=1)
-                feature_templates_bg = torch.cat(feature_templates_bg[:,:m1_first], feature_templates_obj[:,m1_first + templates_n[j]:], dim=1)
-
-            # Add current features to template features
-            cur_features_obj, cur_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r1']))
-            print('cur features:\t', cur_features_obj.shape, cur_features_bg.shape)
-            feature_templates_obj = torch.cat((feature_templates_obj, cur_features_obj), dim=1)
-            feature_templates_bg = torch.cat((feature_templates_bg, cur_features_bg), dim=1)
-            m0_cur, m1_cur = cur_features_obj.shape[1], cur_features_bg.shape[1]
-            m0, m1 = feature_templates_obj.shape[1], feature_templates_bg.shape[1]
-
-            templates_n.append((m0_cur, m1_cur))
+                templates_n.append((m0_cur, m1_cur))
 
             # print('output', output)
             # print('adapt', adaption_seg)
             # print('final', final_seg)
 
-            seg0 = TF.to_pil_image(output.squeeze(0).cpu())
-            seg0.save(os.path.join(out_path, 'seg0_%d.png' % (i + 1)))
+            if args.benchmark:
+                gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i]))
+                gt_tf = TF.to_tensor(gt_seg)
+                iou = iou_tensor(final_seg, gt_tf)
+                print(iou)
 
-            seg1 = TF.to_pil_image(adaption_seg.squeeze(0).cpu())
-            seg1.save(os.path.join(out_path, 'seg1_%d.png' % (i + 1)))
+            if not args.no_aa:
+                seg0 = TF.to_pil_image(output.squeeze(0).cpu())
+                seg0.save(os.path.join(out_path, 'seg0_%d.png' % (i + 1)))
 
-            final_seg = TF.to_pil_image(final_seg.squeeze(0).cpu())
-            final_seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
+                seg1 = TF.to_pil_image(adaption_seg.squeeze(0).cpu())
+                seg1.save(os.path.join(out_path, 'seg1_%d.png' % (i + 1)))
+
+                final_seg = TF.to_pil_image(final_seg.squeeze(0).cpu())
+                final_seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
+            else:
+                final_seg = TF.to_pil_image(final_seg.squeeze(0).cpu())
+                final_seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
 
             running_time.update(time.time() - running_endtime)
             running_endtime = time.time()
+
+            
+
 
             print('Segment: [{0:4}/{1:4}]\t'
                 'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
