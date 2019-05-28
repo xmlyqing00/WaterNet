@@ -35,9 +35,6 @@ def train_AANet():
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch AANet Training')
     parser.add_argument(
-        '--online', action='store_true',
-        help='If the online flag is set, model will be trained in online mode, user must provide video name.')
-    parser.add_argument(
         '--total-epochs', default=int(cfg['params_AA']['total_epochs']), type=int, metavar='N',
         help='Number of total epochs to run (default 100).')
     parser.add_argument(

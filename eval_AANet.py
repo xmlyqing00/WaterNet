@@ -62,9 +62,9 @@ def split_features(feature_map, mask, split_thres=0.7, erosion_iters=0):
     return obj_features, bg_features
 
 
-def compute_similarity(cur_feature, template_features, shape_s, shape_l, topk=20):
+def compute_similarity(cur_feature, feature_templates, shape_s, shape_l, topk=20):
 
-    similarity_scores = cur_feature.matmul(template_features) # Size: (h*w, m0)
+    similarity_scores = cur_feature.matmul(feature_templates) # Size: (h*w, m0)
     topk_scores = similarity_scores.topk(k=topk, dim=1, largest=True)
     avg_scores = topk_scores.values.mean(dim=1).reshape(1, 1, shape_s[0], shape_s[1])
     scores = F.interpolate(avg_scores, shape_l, mode='bilinear', align_corners=False)
@@ -87,6 +87,15 @@ def eval_AANetNet():
 
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch AANet Testing')
+    parser.add_argument(
+        '--no-temporal', action='store_true',
+        help='Evaluate the video without temporally updating templates.')
+    parser.add_argument(
+        '--no-conf', action='store_true',
+        help='Evaluate the video without temporally updating templates.')
+    parser.add_argument(
+        '--no-AA', action='store_true',
+        help='Evaluate the video without temporally updating templates.')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
         help='Path to latest checkpoint (default: none).')
@@ -184,15 +193,17 @@ def eval_AANetNet():
     # Get template fetures. Size: (c, m0), (c, m1)
     pre_frame_mask = F.interpolate(first_frame_mask, size=(h, w), mode='bilinear', align_corners=False).detach()
     # pre_frame_mask Size (1, 1, h, w)
-    template_features_obj, template_features_bg = split_features(feature_map, pre_frame_mask)
-    m0_first = template_features_obj.shape[1]
-    m1_first = template_features_bg.shape[1]
+    feature_templates_obj, feature_templates_bg = split_features(feature_map, pre_frame_mask)
+    m0 = feature_templates_obj.shape[1]
+    m1 = feature_templates_bg.shape[1]
 
-    m0, m1 = m0_first, m1_first
+    m0_first, m1_first = m0, m1
 
-    
+    templates_n = [(m0, m1)]
 
-    print('Init features', template_features_obj.shape, template_features_bg.shape)
+    print('Init features', feature_templates_obj.shape, feature_templates_bg.shape)
+
+    keep_features_n = 7
 
     with torch.no_grad():
         for i, sample in enumerate(eval_loader):
@@ -208,13 +219,13 @@ def eval_AANetNet():
             # Add center features to template features
             center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r0']))
             print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
-            template_features_obj = torch.cat((template_features_obj, center_features_obj), dim=1)
-            template_features_bg = torch.cat((template_features_bg, center_features_bg), dim=1)
-            print('Added conf features:\t', template_features_obj.shape, template_features_bg.shape)
+            feature_templates_obj = torch.cat((feature_templates_obj, center_features_obj), dim=1)
+            feature_templates_bg = torch.cat((feature_templates_bg, center_features_bg), dim=1)
+            print('Added conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
 
             cur_feature = feature_map.reshape((c, feature_n)).transpose(0, 1)
-            scores_obj = compute_similarity(cur_feature, template_features_obj, (h,w), img.shape[2:])
-            scores_bg = compute_similarity(cur_feature, template_features_bg, (h,w), img.shape[2:])
+            scores_obj = compute_similarity(cur_feature, feature_templates_obj, (h,w), img.shape[2:])
+            scores_bg = compute_similarity(cur_feature, feature_templates_bg, (h,w), img.shape[2:])
             scores = torch.cat((scores_bg, scores_obj), dim=1)
             adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
 
@@ -223,12 +234,25 @@ def eval_AANetNet():
             pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
 
             # Remove high-confidence templates
-            template_features_obj = template_features_obj[:,:m0]
-            template_features_bg = template_features_bg[:,:m1]
-            print('Removed high-conf features:\t', template_features_obj.shape, template_features_bg.shape)
+            feature_templates_obj = feature_templates_obj[:,:m0]
+            feature_templates_bg = feature_templates_bg[:,:m1]
+            print('Removed high-conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
                 
-            if i >= 10:
-                
+            # Remove previous feature templates
+            if i > keep_features_n:
+                j = i - keep_features_n
+                feature_templates_obj = torch.cat(feature_templates_obj[:,:m0_first], feature_templates_obj[:,m0_first + templates_n[j]:], dim=1)
+                feature_templates_bg = torch.cat(feature_templates_bg[:,:m1_first], feature_templates_obj[:,m1_first + templates_n[j]:], dim=1)
+
+            # Add current features to template features
+            cur_features_obj, cur_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r1']))
+            print('cur features:\t', cur_features_obj.shape, cur_features_bg.shape)
+            feature_templates_obj = torch.cat((feature_templates_obj, cur_features_obj), dim=1)
+            feature_templates_bg = torch.cat((feature_templates_bg, cur_features_bg), dim=1)
+            m0_cur, m1_cur = cur_features_obj.shape[1], cur_features_bg.shape[1]
+            m0, m1 = feature_templates_obj.shape[1], feature_templates_bg.shape[1]
+
+            templates_n.append((m0_cur, m1_cur))
 
             # print('output', output)
             # print('adapt', adaption_seg)
