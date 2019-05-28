@@ -92,7 +92,7 @@ def eval_AANetNet():
         help='Evaluate the video without temporally updating templates.')
     parser.add_argument(
         '--no-conf', action='store_true',
-        help='Evaluate the video without temporally updating templates.')
+        help='Evaluate the video without high-confidence features updating templates.')
     parser.add_argument(
         '--no-AA', action='store_true',
         help='Evaluate the video without temporally updating templates.')
