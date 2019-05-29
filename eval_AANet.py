@@ -4,6 +4,7 @@ import sys
 import time
 import configparser
 import numpy as np
+import pandas as pd
 import cv2
 import torch
 import torch.nn.functional as F
@@ -135,7 +136,7 @@ def eval_AANetNet():
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name,
-        # eval_size=(640, 640)
+        eval_size=(int(cfg['params_AA']['eval_h']), int(cfg['params_AA']['eval_w']))
     )
     eval_loader = torch.utils.data.DataLoader(
         dataset=dataset,
@@ -164,7 +165,15 @@ def eval_AANetNet():
         raise ValueError('No checkpoint found at \'{}\''.format(args.checkpoint))
 
     # Set ouput path
-    out_path = os.path.join(args.out_folder, args.model_name + '_segs', args.video_name)
+    setting_prefix = args.model_name
+    if args.no_temporal:
+        setting_prefix += '_no_temporal'
+    if args.no_conf:
+        setting_prefix += '_no_conf'
+    if args.no_aa:
+        setting_prefix += '_no_aa'
+    
+    out_path = os.path.join(args.out_folder, setting_prefix + '_segs', args.video_name)
     if not os.path.exists(out_path):
         os.makedirs(out_path)
 
@@ -209,6 +218,8 @@ def eval_AANetNet():
 
     keep_features_n = 7
 
+    avg_iou = 0
+
     if args.benchmark:
         gt_folder = os.path.join(cfg['paths'][cfg_dataset], 'test_annots', args.video_name)
         gt_list = os.listdir(gt_folder)
@@ -229,9 +240,9 @@ def eval_AANetNet():
             if not args.no_conf:
                 # Add center features to template features
                 center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r0']))
-                print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
                 feature_templates_obj = torch.cat((feature_templates_obj, center_features_obj), dim=1)
                 feature_templates_bg = torch.cat((feature_templates_bg, center_features_bg), dim=1)
+                print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
                 print('Added conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
             
             if not args.no_aa:
@@ -242,12 +253,11 @@ def eval_AANetNet():
                 adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
 
                 final_seg = (output + adaption_seg) / 2
-                final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
-                pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
             else:
                 final_seg = output
-                final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
-                pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
+
+            final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
+            pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
             
             if not args.no_conf:
                 # Remove high-confidence templates
@@ -259,8 +269,13 @@ def eval_AANetNet():
                 # Remove previous feature templates
                 if i > keep_features_n:
                     j = i - keep_features_n
-                    feature_templates_obj = torch.cat(feature_templates_obj[:,:m0_first], feature_templates_obj[:,m0_first + templates_n[j]:], dim=1)
-                    feature_templates_bg = torch.cat(feature_templates_bg[:,:m1_first], feature_templates_obj[:,m1_first + templates_n[j]:], dim=1)
+                    print(templates_n[j])
+                    print(m1_first)
+                    print(feature_templates_bg.shape)
+                    feature_templates_obj = torch.cat((feature_templates_obj[:,:m0_first], feature_templates_obj[:,m0_first + templates_n[j][0]:]), dim=1)
+                    feature_templates_bg = torch.cat((feature_templates_bg[:,:m1_first], feature_templates_bg[:,m1_first + templates_n[j][1]:]), dim=1)
+
+                    print('Removed old feature templates.', feature_templates_obj.shape[1], feature_templates_bg.shape[1])
 
                 # Add current features to template features
                 cur_features_obj, cur_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r1']))
@@ -271,16 +286,21 @@ def eval_AANetNet():
                 m0, m1 = feature_templates_obj.shape[1], feature_templates_bg.shape[1]
 
                 templates_n.append((m0_cur, m1_cur))
+                print('template features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
+
 
             # print('output', output)
             # print('adapt', adaption_seg)
             # print('final', final_seg)
 
             if args.benchmark:
-                gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i]))
-                gt_tf = TF.to_tensor(gt_seg)
-                iou = iou_tensor(final_seg, gt_tf)
-                print(iou)
+                gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i])).convert('L')
+                gt_seg.thumbnail((int(cfg['params_AA']['eval_h']), int(cfg['params_AA']['eval_w'])), Image.ANTIALIAS)
+                gt_tf = TF.to_tensor(gt_seg).to(device).type(torch.int)
+
+                iou = iou_tensor(final_seg.squeeze(0).type(torch.int), gt_tf)
+                avg_iou += iou.item()
+                print('iou:', iou.item())
 
             if not args.no_aa:
                 seg0 = TF.to_pil_image(output.squeeze(0).cpu())
@@ -298,15 +318,31 @@ def eval_AANetNet():
             running_time.update(time.time() - running_endtime)
             running_endtime = time.time()
 
-            
-
 
             print('Segment: [{0:4}/{1:4}]\t'
                 'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
                 i + 1, len(eval_loader), running_time=running_time))
 
 
-    run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name, eval_size)
+    if args.benchmark:
+        print('total_iou:', avg_iou)
+        avg_iou /= len(eval_loader)
+        print('avg_iou:', avg_iou, 'frame_num:', len(eval_loader))
+        
+        # scores_path = os.path.join(args.out_folder, 'scores.csv')
+        # print(scores_path)
+        # if os.path.exists(scores_path):
+        #     scores_df = pd.read_csv(scores_path)
+        #     scores_df.set_index(['AANet', 'AANet_no_conf'])
+        # else:
+        #     scores_df = pd.DataFrame({'a':None, 'b':None})
+        # print(scores_df)
+        # scores_df[setting_prefix][args.video_name] = avg_iou
+        # print(scores_df)
+        # scores_df[setting_prefix + '_total'][args.video_name] = len(eval_loader)
+        # scores_df.to_csv(scores_path)
+
+    run_cvt_images_to_overlays(args.video_name, args.out_folder, setting_prefix, eval_size)
     
 if __name__ == '__main__':
     eval_AANetNet()
