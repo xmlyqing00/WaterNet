@@ -25,6 +25,8 @@ if torch.cuda.is_available():
 one_tensor = torch.ones(1).to(device)
 zero_tensor = torch.zeros(1).to(device)
 
+erosion_bg_factor = 3
+
 
 def split_mask(mask, split_thres=0.7, erosion_iters=0):
 
@@ -35,9 +37,30 @@ def split_mask(mask, split_thres=0.7, erosion_iters=0):
         obj_mask = obj_mask.squeeze().cpu().numpy()
         bg_mask = bg_mask.squeeze().cpu().numpy()
         
-        center_mask_obj = ndimage.binary_erosion(obj_mask, iterations=erosion_iters).astype(np.float32)
-        center_mask_bg = ndimage.binary_erosion(bg_mask, iterations=erosion_iters).astype(np.float32)
+        erosion_obj = erosion_iters
+        erosion_bg = erosion_iters * erosion_bg_factor
+
+        # print('obj_before', obj_mask)
+        # print('bg_before', bg_mask)
+
+        obj_mask_pad = np.pad(obj_mask, ((erosion_obj, erosion_obj), (erosion_obj, erosion_obj)), 'edge')
+        bg_mask_pad = np.pad(bg_mask, ((erosion_bg, erosion_bg), (erosion_bg, erosion_bg)), 'edge')
+
+        # print('obj_pad', obj_mask_pad)
+        # print('bg_pad', bg_mask_pad)
+
+        center_mask_obj = ndimage.binary_erosion(obj_mask_pad, iterations=erosion_iters).astype(np.float32)
+        center_mask_bg = ndimage.binary_erosion(bg_mask_pad, iterations=erosion_iters*3).astype(np.float32)
         
+        # print('obj_erosion', center_mask_obj)
+        # print('bg_erosion', center_mask_bg)
+
+        center_mask_obj = center_mask_obj[erosion_obj: erosion_obj + obj_mask.shape[0], erosion_obj: erosion_obj + obj_mask.shape[1]]
+        center_mask_bg = center_mask_bg[erosion_bg: erosion_bg + bg_mask.shape[0], erosion_bg: erosion_bg + bg_mask.shape[1]]
+
+        # print('obj_crop', center_mask_obj)
+        # print('bg_crop', center_mask_bg)
+
         # Debug
         # print('obj_mask', obj_mask)
         # print('center_mask_obj', center_mask_obj)
@@ -226,6 +249,7 @@ def eval_AANetNet():
         gt_list.sort(key = lambda x: (len(x), x))
         gt_list.pop(0)
 
+    print('Erosion params:', int(cfg['params_AA']['r0']), int(cfg['params_AA']['r1']))
     with torch.no_grad():
         for i, sample in enumerate(eval_loader):
 
@@ -237,14 +261,14 @@ def eval_AANetNet():
             feature_map = feature_map.detach().squeeze(0)
             feature_map /= feature_map.norm(p=2, dim=0, keepdim=True) # Size: (c, h, w)
 
-            if not args.no_conf:
+            if not args.no_conf and not args.no_aa:
                 # Add center features to template features
                 center_features_obj, center_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r0']))
                 feature_templates_obj = torch.cat((feature_templates_obj, center_features_obj), dim=1)
                 feature_templates_bg = torch.cat((feature_templates_bg, center_features_bg), dim=1)
                 print('Conf features:\t', center_features_obj.shape, center_features_bg.shape)
                 print('Added conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
-            
+
             if not args.no_aa:
                 cur_feature = feature_map.reshape((c, feature_n)).transpose(0, 1)
                 scores_obj = compute_similarity(cur_feature, feature_templates_obj, (h,w), img.shape[2:])
@@ -252,20 +276,21 @@ def eval_AANetNet():
                 scores = torch.cat((scores_bg, scores_obj), dim=1)
                 adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
 
-                final_seg = (output + adaption_seg) / 2
+                final_seg = 0.6 * output + 0.4 * adaption_seg
             else:
                 final_seg = output
 
             final_seg = torch.where(final_seg > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
             pre_frame_mask = F.interpolate(final_seg, size=(h, w), mode='bilinear', align_corners=False).detach()
             
-            if not args.no_conf:
+            if not args.no_conf and not args.no_aa:
                 # Remove high-confidence templates
                 feature_templates_obj = feature_templates_obj[:,:m0]
                 feature_templates_bg = feature_templates_bg[:,:m1]
                 print('Removed high-conf features:\t', feature_templates_obj.shape, feature_templates_bg.shape)
             
-            if not args.no_temporal:
+            if not args.no_temporal and not args.no_aa:
+
                 # Remove previous feature templates
                 if i > keep_features_n:
                     j = i - keep_features_n

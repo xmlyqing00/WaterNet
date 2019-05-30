@@ -13,6 +13,7 @@ from src.network import OSVOSNet
 from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
+from src.utils import load_image_in_PIL, iou_tensor
 
 
 def eval_OSVOSNetNet():
@@ -40,6 +41,9 @@ def eval_OSVOSNetNet():
     parser.add_argument(
         '-o', '--out-folder', default=cfg['paths'][cfg_dataset], type=str, metavar='PATH',
         help='Folder for the output segmentations.')
+    parser.add_argument(
+        '-b', '--benchmark', action='store_true',
+        help='Evaluate the video with groundtruth.')
     args = parser.parse_args()
 
     print('Args:', args)
@@ -108,24 +112,44 @@ def eval_OSVOSNetNet():
     first_frame_seg.save(os.path.join(out_path, '0.png'))
     pre_frame_mask = pre_frame_mask.unsqueeze(0).to(device)
     
-    for i, sample in enumerate(eval_loader):
+    if args.benchmark:
+        gt_folder = os.path.join(cfg['paths'][cfg_dataset], 'test_annots', args.video_name)
+        gt_list = os.listdir(gt_folder)
+        gt_list.sort(key = lambda x: (len(x), x))
+        gt_list.pop(0)
+    avg_iou = 0
 
-        img = sample['img'].to(device)     
+    with torch.no_grad():
+        for i, sample in enumerate(eval_loader):
 
-        outputs = OSVOS_net(img)
+            img = sample['img'].to(device)     
 
-        output = outputs[-1].detach()
-        output = 1 / (1 + torch.exp(-output))
-        seg_raw = TF.to_pil_image(output.squeeze(0).cpu())
-        seg_raw = dataset.resize_to_origin(seg_raw)
-        seg_raw.save(os.path.join(out_path, '%d.png' % (i + 1)))
+            outputs = OSVOS_net(img)
 
-        running_time.update(time.time() - running_endtime)
-        running_endtime = time.time()
+            output = outputs[-1].detach()
+            output = 1 / (1 + torch.exp(-output))
+            seg_raw = TF.to_pil_image(output.squeeze(0).cpu())
+            seg_raw.save(os.path.join(out_path, '%d.png' % (i + 1)))
 
-        print('Segment: [{0:4}/{1:4}]\t'
-            'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
-            i + 1, len(eval_loader), running_time=running_time))
+            running_time.update(time.time() - running_endtime)
+            running_endtime = time.time()
+
+            if args.benchmark:
+                gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i])).convert('L')
+                gt_tf = TF.to_tensor(gt_seg).to(device).type(torch.int)
+
+                iou = iou_tensor(pre_frame_mask.squeeze(0).type(torch.int), gt_tf)
+                avg_iou += iou.item()
+                print('iou:', iou.item())
+
+            print('Segment: [{0:4}/{1:4}]\t'
+                'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
+                i + 1, len(eval_loader), running_time=running_time))
+
+    if args.benchmark:
+        print('total_iou:', avg_iou)
+        avg_iou /= len(eval_loader)
+        print('avg_iou:', avg_iou, 'frame_num:', len(eval_loader))
 
     run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name)
     

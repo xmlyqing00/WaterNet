@@ -9,7 +9,7 @@ def add_mask_to_image(image, mask, label_color):
     # cv2.imshow("input_mask", mask)
 
     roi = cvt_object_label(mask, label_color, [255, 255, 255])
-    mask = cvt_object_label(mask, label_color, [255, 0, 255])
+    mask = cvt_object_label(mask, label_color, [255, 0, 0])
     
     complement = cv2.bitwise_not(roi)
     complement_img = cv2.bitwise_and(complement, image)
@@ -21,7 +21,7 @@ def add_mask_to_image(image, mask, label_color):
     # cv2.imshow("mask", mask)
     # cv2.waitKey()
 
-    alpha = 0.8
+    alpha = 0.5
     image_mask = image.copy()
     cv2.addWeighted(image, alpha, mask, 1 - alpha, 0, image_mask)
 

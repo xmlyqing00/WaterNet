@@ -111,7 +111,7 @@ def run_riversegs():
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
 
-    label_folder = os.path.join(cfg['paths']['dataset'], 'labels', 'river_segs')
+    label_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'labels', 'river_segs')
     label_files = os.listdir(label_folder)
 
     for label_name in label_files:
@@ -120,6 +120,9 @@ def run_riversegs():
         print(img_path)
 
         img = cv2.imread(img_path)
+        if img.max() == 255:
+            print('skip')
+            continue
         img2 = img * 255
         cv2.imwrite(img_path, img2)
 

@@ -232,22 +232,22 @@ class RGBMaskNet(FCNBase):
         # print(pool0.shape, pool1.shape, pool2.shape, x.shape)
 
         x = self.deconv1(x)
-        x = self.aligh_shape(x, pool2.shape)
+        x = self.align_shape(x, pool2.shape)
         # print(x.shape)
         x = x + pool2
 
         x = self.deconv2(x)
-        x = self.aligh_shape(x, pool1.shape)
+        x = self.align_shape(x, pool1.shape)
         # print(x.shape)
         x = x + pool1
 
         x = self.deconv3(x)
-        x = self.aligh_shape(x, pool0.shape)
+        x = self.align_shape(x, pool0.shape)
         # print(x.shape)
         x = x + pool0
 
         x = self.deconv4(x)
-        x = self.aligh_shape(x, input_shape)
+        x = self.align_shape(x, input_shape)
         # print(x.shape)
 
         x = self.sigmoid(x)

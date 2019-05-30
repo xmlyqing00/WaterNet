@@ -10,12 +10,10 @@ from src.AANet import FeatureNet, DeconvNet
 from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 
-def adjust_learning_rate(optimizer, start_lr, epoch, online_mode):
+def adjust_learning_rate(optimizer, start_lr, epoch):
     """Sets the learning rate to the initial LR decayed by 10 every x epochs"""
-    if online_mode:
-        decay_iters = 10
-    else:
-        decay_iters = 40
+
+    decay_iters = 40
     lr = start_lr * (0.1 ** (epoch // decay_iters))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
@@ -43,18 +41,9 @@ def train_AANet():
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
         help='Path to latest checkpoint (default: none).')
-    parser.add_argument(
-        '-v', '--video-name', default=None, type=str, metavar='VIDEO_NAME',
-        help='Test video name (default: none).')
     args = parser.parse_args()
 
     print('Args:', args)
-
-    assert(not args.online or (args.online and args.checkpoint))
-    assert(not args.online or (args.online and args.video_name))
-
-    if args.online and args.lr == float(cfg['params_AA']['lr']):
-        args.lr /= 10
 
     # Device
     device = torch.device('cpu')
@@ -69,31 +58,17 @@ def train_AANet():
             'pin_memory': bool(cfg['params_AA']['pin_memory'])
         }
 
-    if not args.online:
-        dataset = WaterDataset_RGB(
-            mode='train_offline',
-            dataset_path=cfg['paths'][cfg_dataset],
-            input_size=(int(cfg['params_AA']['input_w']), int(cfg['params_AA']['input_h']))
-        )
-        train_loader = torch.utils.data.DataLoader(
-            dataset=dataset,
-            batch_size=int(cfg['params_AA']['batch_size']),
-            shuffle=True,
-            **dataset_args
-        )
-    else:
-        dataset = WaterDataset_RGB(
-            mode='train_online',
-            dataset_path=cfg['paths'][cfg_dataset],
-            input_size=(int(cfg['params_AA']['input_w']), int(cfg['params_AA']['input_h'])),
-            test_case=args.video_name
-        )
-        train_loader = torch.utils.data.DataLoader(
-            dataset=dataset,
-            batch_size=int(cfg['params_AA']['batch_size']),
-            shuffle=False,
-            **dataset_args
-        )
+    dataset = WaterDataset_RGB(
+        mode='train_offline',
+        dataset_path=cfg['paths'][cfg_dataset],
+        input_size=(int(cfg['params_AA']['input_w']), int(cfg['params_AA']['input_h']))
+    )
+    train_loader = torch.utils.data.DataLoader(
+        dataset=dataset,
+        batch_size=int(cfg['params_AA']['batch_size']),
+        shuffle=True,
+        **dataset_args
+    )
 
     # Model
     feature_net = FeatureNet().to(device)
@@ -152,8 +127,6 @@ def train_AANet():
     epoch_time = AverageMeter()
 
     training_mode = 'Offline'
-    if args.online:
-        training_mode = 'Online'
 
     for epoch in range(start_epoch, args.total_epochs):
         
@@ -164,12 +137,8 @@ def train_AANet():
         for j in range(5):
             running_loss_tr.append(AverageMeter())
 
-        if args.online:
-            adjust_learning_rate(feature_net_optimizer, args.lr, epoch - start_epoch, args.online)   
-            adjust_learning_rate(deconv_net_optimizer, args.lr, epoch - start_epoch, args.online)  
-        else:
-            adjust_learning_rate(feature_net_optimizer, args.lr, epoch, args.online)   
-            adjust_learning_rate(deconv_net_optimizer, args.lr, epoch, args.online)
+        adjust_learning_rate(feature_net_optimizer, args.lr, epoch)   
+        adjust_learning_rate(deconv_net_optimizer, args.lr, epoch)
         lr = -1
         for param_group in feature_net_optimizer.param_groups:
             lr = param_group['lr']
@@ -195,7 +164,7 @@ def train_AANet():
 
             losses.update(loss.item())
 
-            if args.online or ((i + 1) % 10 == 0 or (i + 1) == len(train_loader)):
+            if (i + 1) % 10 == 0 or (i + 1) == len(train_loader):
 
                 batch_time.update(time.time() - batch_endtime)
                 batch_endtime = time.time()
@@ -215,8 +184,6 @@ def train_AANet():
 
         if (epoch + 1) % 10 == 0 or (i + 1) == args.total_epochs:
             suffix = ''
-            if args.online:
-                suffix = '_' + args.video_name
             model_path = os.path.join(cfg['paths']['models'], 'cp_AANet_{0}{1}.pth.tar'.format(epoch, suffix))
             torch.save(
                 obj={

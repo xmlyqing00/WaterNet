@@ -12,6 +12,7 @@ from src.network import RGBMaskNet
 from src.dataset import WaterDataset_RGBMask
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
+from src.utils import load_image_in_PIL, iou_tensor
 
 
 def eval_RGBMaskNet():
@@ -39,6 +40,9 @@ def eval_RGBMaskNet():
     parser.add_argument(
         '-o', '--out-folder', default=cfg['paths'][cfg_dataset], type=str, metavar='PATH',
         help='Folder for the output segmentations.')
+    parser.add_argument(
+        '-b', '--benchmark', action='store_true',
+        help='Evaluate the video with groundtruth.')
     args = parser.parse_args()
 
     print('Args:', args)
@@ -104,6 +108,13 @@ def eval_RGBMaskNet():
     first_frame_seg.save(os.path.join(out_path, '0.png'))
     pre_frame_mask = pre_frame_mask.unsqueeze(0).to(device)
 
+    if args.benchmark:
+        gt_folder = os.path.join(cfg['paths'][cfg_dataset], 'test_annots', args.video_name)
+        gt_list = os.listdir(gt_folder)
+        gt_list.sort(key = lambda x: (len(x), x))
+        gt_list.pop(0)
+    avg_iou = 0
+
     for i, sample in enumerate(eval_loader):
 
         img = sample['img'].to(device)     
@@ -117,16 +128,32 @@ def eval_RGBMaskNet():
 
         zero_tensor = torch.zeros(pre_frame_mask.shape).to(device)
         one_tensor = torch.ones(pre_frame_mask.shape).to(device)
-        pre_frame_mask = torch.where(pre_frame_mask > water_thres, pre_frame_mask, zero_tensor)
+        pre_frame_mask = torch.where(pre_frame_mask > water_thres, one_tensor, zero_tensor)
         seg = TF.to_pil_image(pre_frame_mask.squeeze(0).cpu())
         seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
 
         running_time.update(time.time() - running_endtime)
         running_endtime = time.time()
 
+        if args.benchmark:
+            gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i])).convert('L')
+            gt_tf = TF.to_tensor(gt_seg).to(device).type(torch.int)
+
+            print(pre_frame_mask.squeeze(0).type(torch.int).max())
+            print(gt_tf.max())
+            iou = iou_tensor(pre_frame_mask.squeeze(0).type(torch.int), gt_tf)
+            avg_iou += iou.item()
+            print('iou:', iou.item())
+
         print('Segment: [{0:4}/{1:4}]\t'
             'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
             i + 1, len(eval_loader), running_time=running_time))
+   
+
+    if args.benchmark:
+        print('total_iou:', avg_iou)
+        avg_iou /= len(eval_loader)
+        print('avg_iou:', avg_iou, 'frame_num:', len(eval_loader))
 
     run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name)
     
