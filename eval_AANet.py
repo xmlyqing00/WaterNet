@@ -25,8 +25,8 @@ if torch.cuda.is_available():
 one_tensor = torch.ones(1).to(device)
 zero_tensor = torch.zeros(1).to(device)
 
-erosion_bg_factor = 3
-
+erosion_bg_factor = 2
+l = 0.7
 
 def split_mask(mask, split_thres=0.7, erosion_iters=0):
 
@@ -275,8 +275,9 @@ def eval_AANetNet():
                 scores_bg = compute_similarity(cur_feature, feature_templates_bg, (h,w), img.shape[2:])
                 scores = torch.cat((scores_bg, scores_obj), dim=1)
                 adaption_seg = F.softmax(scores, dim=1).argmax(dim=1).type(torch.float).detach() # Size: (1, 1, h, w)
+                # adaption_seg = F.softmax(scores, dim=1)[0,1].detach() # Size: (1, 1, h, w)
 
-                final_seg = 0.6 * output + 0.4 * adaption_seg
+                final_seg = (1-l) * output + l * adaption_seg
             else:
                 final_seg = output
 

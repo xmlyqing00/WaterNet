@@ -129,8 +129,14 @@ def eval_OSVOSNetNet():
             output = outputs[-1].detach()
             output = 1 / (1 + torch.exp(-output))
             seg_raw = TF.to_pil_image(output.squeeze(0).cpu())
-            seg_raw.save(os.path.join(out_path, '%d.png' % (i + 1)))
+            seg_raw.save(os.path.join(out_path, 'raw_%d.png' % (i + 1)))
 
+            zero_tensor = torch.zeros(output.shape).to(device)
+            one_tensor = torch.ones(output.shape).to(device)
+            seg_tf = torch.where(output > water_thres, one_tensor, zero_tensor)
+            seg = TF.to_pil_image(seg_tf.squeeze(0).cpu())
+            seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
+            
             running_time.update(time.time() - running_endtime)
             running_endtime = time.time()
 
@@ -138,7 +144,7 @@ def eval_OSVOSNetNet():
                 gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i])).convert('L')
                 gt_tf = TF.to_tensor(gt_seg).to(device).type(torch.int)
 
-                iou = iou_tensor(pre_frame_mask.squeeze(0).type(torch.int), gt_tf)
+                iou = iou_tensor(seg_tf.squeeze(0).type(torch.int), gt_tf)
                 avg_iou += iou.item()
                 print('iou:', iou.item())
 
