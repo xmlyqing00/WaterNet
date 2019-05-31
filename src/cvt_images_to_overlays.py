@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 
-from src.cvt_object_label import cvt_object_label
+from .cvt_object_label import cvt_object_label
 
 def add_mask_to_image(image, mask, label_color):
     
@@ -67,7 +67,14 @@ def cvt_images_to_overlays(image_folder,
         mask = cv2.imread(mask_path)
         mask = binary_threshold(mask)
 
+        origin_shape = image.shape
+        if mask.shape != image.shape:
+            image = cv2.resize(image, (mask.shape[1], mask.shape[0]), None)
+
         image_mask = add_mask_to_image(image, mask, label_color)
+
+        if image_mask.shape != origin_shape:
+            image_mask = cv2.resize(image_mask, (origin_shape[1], origin_shape[0]), None)
 
         filename, ext = os.path.splitext(image_list[image_idx])
         output_name = filename + '_mask.png'
@@ -100,5 +107,9 @@ def run_add_mask_to_image():
 if __name__ == '__main__':
     
     root_folder = '/Ship01/Dataset/water/collection/'
-    run_cvt_images_to_overlays('canal0', root_folder, 'OSVOSNet_online')
+    video_name_set = ['canal0', 'stream0', 'stream1', 'stream3_small', 'stream4', 'buffalo0_small', 'boston_harbor2_small_rois']
+    model_name = 'FEELVOS'
+
+    for video_folder in video_name_set:
+        run_cvt_images_to_overlays(video_folder, root_folder, model_name)
     # run_add_mask_to_image()

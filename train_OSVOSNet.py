@@ -181,7 +181,7 @@ def train_OSVOSNet():
 
             losses.update(loss.item())
 
-            if args.online or ((i + 1) % 10 == 0 or (i + 1) == len(train_loader)):
+            if (i + 1) % 10 == 0 or (i + 1) == len(train_loader):
 
                 batch_time.update(time.time() - batch_endtime)
                 batch_endtime = time.time()

@@ -5,6 +5,7 @@ import time
 import numpy as np
 import cv2
 import torch
+import random
 from torch.utils import model_zoo
 import configparser
 import torchvision.transforms.functional as TF
@@ -14,32 +15,55 @@ from PIL import Image
 from src.AANet import FeatureNet
 from src.dataset import WaterDataset_RGB
 
+def diff_feature_map(feature_map0, feature_map1):
 
-def vis_features(feature_map0, feature_map1, x, y):
-
-    # Feature diff
     c, h, w = feature_map0.shape
     print('c h w:', c, h, w)
 
-    x = int(x * w)
-    y = int(y * h)
-
-    print('x y:', x, y)
-
-    fig, axes = plt.subplots(nrows=1, ncols=2)
+    fig, axes = plt.subplots(nrows=1, ncols=1)
 
     diff_map = (feature_map0 - feature_map1) ** 2
     diff_map = np.sqrt(np.sum(diff_map, 0) / c)
-    axes[0].imshow(diff_map, cmap='plasma', interpolation='nearest')
+    im = axes[0].imshow(diff_map, cmap='plasma', interpolation='nearest', vmin=0, vmax=2.5)
     
-    vec = feature_map1[:,y,x]
-    vec_tile = np.tile(vec, h * w).reshape(h, w, c).transpose(2, 0, 1)
+    fig.colorbar(im, ax=axes.ravel().tolist())
 
-    diff_map = (feature_map1 - vec_tile) ** 2
-    diff_map = np.sqrt(np.sum(diff_map, 0) / c)
-    
-    im = axes[1].imshow(diff_map, cmap='plasma', interpolation='nearest')
-    
+    plt.show()
+
+def vis_features(feature_map, xy_list):
+
+    # Feature diff
+    c, h, w = feature_map.shape
+    print('c h w:', c, h, w)
+
+    fig, axes = plt.subplots(nrows=1, ncols=3)
+
+    diff_map_min = None
+
+    for i, xy in enumerate(xy_list):
+        x = int(xy[0] * w)
+        y = int(xy[1] * h)
+
+        print('x y:', x, y)
+
+        vec = feature_map[:,y,x]
+        vec_tile = np.tile(vec, h * w).reshape(h, w, c).transpose(2, 0, 1)
+
+        diff_map = (feature_map - vec_tile) ** 2
+        diff_map = np.sqrt(np.sum(diff_map, 0) / c)
+
+        if i == 0:
+            diff_map_min = diff_map
+        else:
+            diff_map_min = np.minimum(diff_map_min, diff_map)
+
+        if i == 0:    
+            im = axes[0].imshow(diff_map_min, cmap='plasma', interpolation='nearest', vmin=0, vmax=2.5)
+        elif i == int(len(xy_list)/4) - 1:
+            im = axes[1].imshow(diff_map_min, cmap='plasma', interpolation='nearest', vmin=0, vmax=2.5)
+        elif i == len(xy_list) - 1:
+            im = axes[2].imshow(diff_map_min, cmap='plasma', interpolation='nearest', vmin=0, vmax=2.5)
+
     fig.colorbar(im, ax=axes.ravel().tolist())
 
     plt.show()
@@ -139,9 +163,21 @@ def show_feature_map_similarity():
         feature_map1, _, _, _ = feature_net(img)
         feature_map1 = feature_map1.detach().squeeze(0).cpu().numpy()
 
+    # diff_feature_map(feature_map0, feature_map1)
+
     # Position
-    x, y = 0.5, 0.7
-    vis_features(feature_map0, feature_map1, x, y)
+    # xy_list = [
+    #     (0.35, 0.65625), (0.35, 0.4375), (0.325, 0.375), (0.675, 0.6875), (0.5, 0.7), 
+    #     (0.375, 0.84375), (0.15, 0.875), (0.65, 0.53125), (0.325, 0.90625), (0.85, 0.84375)]
+    xy_list = []
+    for i in range(20):
+        x = random.random() * 0.8 + 0.1
+        y = random.random() * 0.425 + 0.375
+        xy_list.append((x,y))
+
+    print(xy_list)
+    vis_features(feature_map1, xy_list)
+
     
 if __name__ == '__main__':
     show_feature_map_similarity()
