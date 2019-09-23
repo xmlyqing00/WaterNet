@@ -30,9 +30,19 @@ def cvt_object_label(img, ori_label_color, dst_label_color=None):
 
 if __name__ == '__main__':
 
-    video_name = 'boston_harbor2_small_rois'
+    video_name = 'aberlour'
     folder = os.path.join('/Ship01/Dataset/water/collection/test_annots/', video_name)
     
+    # labelme_json_to_dataset
+    name_list = os.listdir(folder)
+    for file_name in name_list:
+        if file_name[-5:] == '.json' and file_name[0] != '.':
+            file_path = os.path.join(folder, file_name)
+            cmd = 'labelme_json_to_dataset \'%s\'' % file_path
+            print(cmd)
+            os.system(cmd)
+
+
     name_list = os.listdir(folder)
     for frame_name in name_list:
         if frame_name[-5:] == '_json' and frame_name[0] != '.':

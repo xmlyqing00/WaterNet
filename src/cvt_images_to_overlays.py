@@ -87,8 +87,8 @@ def cvt_images_to_overlays(image_folder,
 def run_cvt_images_to_overlays(video_name, root_folder, model_name='RGBMaskNet', eval_size=None):
 
     image_folder = os.path.join(root_folder, 'test_videos/', video_name)
-    mask_folder = os.path.join(root_folder, model_name + '_segs', video_name)
-    output_folder = os.path.join(root_folder, model_name + '_overlays', video_name)
+    mask_folder = os.path.join(root_folder, 'results', model_name + '_segs', video_name)
+    output_folder = os.path.join(root_folder, 'results', model_name + '_overlays', video_name)
     label_color = (255, 255, 255)
     stride = 1
     frame_st = 0

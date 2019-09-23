@@ -99,8 +99,8 @@ class WaterDataset(data.Dataset):
 
             if self.eval_size:
                 self.origin_size = self.first_frame.size
-                self.first_frame.thumbnail(self.eval_size, Image.ANTIALIAS)
-                self.first_frame_label.thumbnail(self.eval_size, Image.ANTIALIAS)
+                self.first_frame = self.first_frame.resize(self.eval_size, Image.ANTIALIAS)
+                self.first_frame_label = self.first_frame_label.resize(self.eval_size, Image.ANTIALIAS)
 
         else:
             raise('Mode %s does not support in [train_offline, train_online, eval].' % mode)
@@ -143,7 +143,7 @@ class WaterDataset_RGB(WaterDataset):
         elif self.mode == 'eval':
             img = load_image_in_PIL(self.img_list[index]).convert('RGB')
             if self.eval_size:
-                img.thumbnail(self.eval_size, Image.ANTIALIAS)
+                img = img.resize(self.eval_size, Image.ANTIALIAS)
             sample = self.apply_transforms(img)
         
         return sample
