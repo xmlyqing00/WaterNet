@@ -5,6 +5,7 @@ nohup.out
 __pycache__/
 
 data/
+features/
 tmp/
 models/*.pth.tar
 models_backup/

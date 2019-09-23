@@ -14,8 +14,9 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 from scipy import ndimage
 
-from src.AANet import FeatureNet, DeconvNet
-from src.dataset import WaterDataset_RGB
+from src.AANet.feature_net import FeatureNet
+from src.AANet.features import FeatureTemplates, split_mask, split_features, calc_similarity
+from src.AANet.dataset import WaterDataset
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
 from src.utils import load_image_in_PIL, iou_tensor
@@ -161,16 +162,17 @@ def eval_AANetNet():
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': int(cfg['params_AA']['num_workers']),
-            'pin_memory': bool(cfg['params_AA']['pin_memory'])
+            'num_workers': 1, # int(cfg['params_AA']['num_workers']),
+            'pin_memory': False # bool(cfg['params_AA']['pin_memory'])
         }
 
-    dataset = WaterDataset_RGB(
+    dataset = WaterDataset(
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name,
         eval_size=(int(cfg['params_AA']['eval_w']), int(cfg['params_AA']['eval_h']))
     )
+    
     eval_loader = torch.utils.data.DataLoader(
         dataset=dataset,
         batch_size=1,
@@ -178,33 +180,12 @@ def eval_AANetNet():
         **dataset_args
     )
 
-    # Model
-    feature_net = FeatureNet()
-    deconv_net = DeconvNet()
-
     # Load pretrained model
-    if os.path.isfile(args.checkpoint):
-        print('Load checkpoint \'{}\''.format(args.checkpoint))
-        if torch.cuda.is_available():
-            checkpoint = torch.load(args.checkpoint)
-        else:
-            checkpoint = torch.load(args.checkpoint, map_location='cpu')
-        args.start_epoch = checkpoint['epoch'] + 1
-        feature_net.load_state_dict(checkpoint['feature_net'])
-        deconv_net.load_state_dict(checkpoint['deconv_net'])
-        print('Loaded checkpoint \'{}\' (epoch {})'
-                .format(args.checkpoint, checkpoint['epoch']))
-    else:
-        raise ValueError('No checkpoint found at \'{}\''.format(args.checkpoint))
-
     # Set ouput path
     setting_prefix = args.model_name
-    if args.no_temporal:
-        setting_prefix += '_no_temporal'
-    if args.no_conf:
-        setting_prefix += '_no_conf'
-    if args.no_aa:
-        setting_prefix += '_no_aa'
+
+    feature_templates = FeatureTemplates(args.checkpoint)
+    f_obj, f_bg = feature_templates.build_from_eval(args.video)
     
     out_path = os.path.join(args.out_folder, setting_prefix + '_segs', args.video_name)
     if not os.path.exists(out_path):
@@ -331,7 +312,7 @@ def eval_AANetNet():
             seg_final = torch.where(seg_final > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
             pre_frame_mask = F.interpolate(seg_final, size=(h, w), mode='bilinear', align_corners=False).detach()
             
-            if not args.no_temporal and not args.no_aa:
+            # if not args.no_temporal and not args.no_aa:
 
                 # Remove previous feature templates
                 if i >= keep_features_n:
