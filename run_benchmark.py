@@ -4,6 +4,7 @@ root_folder = '/Ship01/Dataset/water/'
 full_videos = ['stream0', 'stream1', 'stream3_small', 'stream4', 'boston_harbor2_small_rois', 'buffalo0_small', 'canal0']
 
 sample_flag = ' --sample '
+no_AA_flag = '--no-AA'
 
 def run_benchmark():
 

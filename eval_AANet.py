@@ -14,9 +14,8 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 from scipy import ndimage
 
-from src.AANet.feature_net import FeatureNet
-from src.AANet.features import FeatureTemplates, split_mask, split_features, calc_similarity
-from src.AANet.dataset import WaterDataset
+from src.AANet import FeatureNet, DeconvNet
+from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
 from src.utils import load_image_in_PIL, iou_tensor
@@ -153,7 +152,7 @@ def eval_AANetNet():
     
     # Hyper parameters 2
     water_thres = 0.5
-    l0, l1, l2 = 0.2, 0.5, 0.3
+    l0, l1, l2 = 0.1, 0.4, 0.5
     if args.no_conf:
         l0, l1 = 0.3, 0.7
     l_aa = 0.5
@@ -166,7 +165,7 @@ def eval_AANetNet():
             'pin_memory': False # bool(cfg['params_AA']['pin_memory'])
         }
 
-    dataset = WaterDataset(
+    dataset = WaterDataset_RGB(
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name,
@@ -180,12 +179,33 @@ def eval_AANetNet():
         **dataset_args
     )
 
+     # Model
+    feature_net = FeatureNet()
+    deconv_net = DeconvNet()
+
     # Load pretrained model
+    if os.path.isfile(args.checkpoint):
+        print('Load checkpoint \'{}\''.format(args.checkpoint))
+        if torch.cuda.is_available():
+            checkpoint = torch.load(args.checkpoint)
+        else:
+            checkpoint = torch.load(args.checkpoint, map_location='cpu')
+        args.start_epoch = checkpoint['epoch'] + 1
+        feature_net.load_state_dict(checkpoint['feature_net'])
+        deconv_net.load_state_dict(checkpoint['deconv_net'])
+        print('Loaded checkpoint \'{}\' (epoch {})'
+                .format(args.checkpoint, checkpoint['epoch']))
+    else:
+        raise ValueError('No checkpoint found at \'{}\''.format(args.checkpoint))
+
     # Set ouput path
     setting_prefix = args.model_name
-
-    feature_templates = FeatureTemplates(args.checkpoint)
-    f_obj, f_bg = feature_templates.build_from_eval(args.video)
+    if args.no_temporal:
+        setting_prefix += '_no_temporal'
+    if args.no_conf:
+        setting_prefix += '_no_conf'
+    if args.no_aa:
+        setting_prefix += '_no_aa'
     
     out_path = os.path.join(args.out_folder, setting_prefix + '_segs', args.video_name)
     if not os.path.exists(out_path):
@@ -237,8 +257,6 @@ def eval_AANetNet():
 
     keep_features_n = int(cfg['params_AA']['temporal_n'])
 
-    avg_iou = 0
-
     print('Erosion params.\t', 'Conf:', int(cfg['params_AA']['r0']), 'Temporal:', int(cfg['params_AA']['r1']))
     print('\n')
 
@@ -248,11 +266,11 @@ def eval_AANetNet():
             img = sample['img'].to(device)     
 
             f3, f0, f1, f2 = feature_net(img)
+            seg_fcn = deconv_net(f3, f0, f1, f2, img.shape).detach() # Size: (1, 1, h, w)
+
             f2 = F.interpolate(f2, size=f1.shape[-2:], mode='bilinear', align_corners=False)
             f3 = F.interpolate(f3, size=f1.shape[-2:], mode='bilinear', align_corners=False)
             feature_map = torch.cat((f1, f2, f3), 1)
-
-            seg_fcn = deconv_net(f3, f0, f1, f2, img.shape).detach() # Size: (1, 1, h, w)
 
             if not args.no_aa:
 
@@ -297,7 +315,7 @@ def eval_AANetNet():
                         scores_bg = torch.zeros(img.shape[2:]).to(device)
                     seg_conf = (((scores_obj - scores_bg) + 1) / 2).squeeze(1)
                     val_min = seg_conf.min()
-                    seg_conf = (seg_conf - val_min) / (seg_temporal.max() - val_min)
+                    seg_conf = (seg_conf - val_min) / (seg_conf.max() - val_min)
 
                     seg_aa = l0 * seg_first + l1 * seg_temporal + l2 * seg_conf
                 else:
@@ -312,7 +330,7 @@ def eval_AANetNet():
             seg_final = torch.where(seg_final > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
             pre_frame_mask = F.interpolate(seg_final, size=(h, w), mode='bilinear', align_corners=False).detach()
             
-            # if not args.no_temporal and not args.no_aa:
+            if not args.no_aa:
 
                 # Remove previous feature templates
                 if i >= keep_features_n:
@@ -371,25 +389,24 @@ def eval_AANetNet():
 
                 seg_conf = TF.to_pil_image(seg_conf.squeeze(0).cpu())
                 axes[0][2].imshow(seg_conf, cmap='gray', interpolation='nearest', vmin=0, vmax=255)
-                axes[0][2].set_title('(c) seg by conf area')
-
-                
 
                 seg_aa = TF.to_pil_image(seg_aa.squeeze(0).cpu())
                 axes[1][0].imshow(seg_aa, cmap='gray', interpolation='nearest', vmin=0, vmax=255)
-                # axes[1][0].imshow(seg_aa)
-                axes[1][0].set_title('(c) seg by water branch')
+
+                axes[1][0].set_title('(d) seg by water branch')
 
                 seg_fcn = TF.to_pil_image(seg_fcn.squeeze(0).cpu())
                 axes[1][1].imshow(seg_fcn, cmap='gray', interpolation='nearest', vmin=0, vmax=255)
-                # axes[1][1].imshow(seg_fcn)
-                axes[1][1].set_title('(d) seg by parent branch')
+                axes[1][1].set_title('(e) seg by parent branch')
 
                 axes[1][2].imshow(seg_final, cmap='gray', interpolation='nearest', vmin=0, vmax=255)
-                # axes[1][2].imshow(seg_final)
-                axes[1][2].set_title('(e) final segmentation')
-                
-                plt.savefig(os.path.join(out_path, 'v_%d.png' %(i + 1)), bbox_inches='tight', pad_inches = 0)
+                axes[1][2].set_title('(f) final segmentation')
+
+                if args.sample:
+                    plt.savefig(os.path.join(out_full_path, 'v_%d.png' %(i + 1)), bbox_inches='tight', pad_inches = 0)
+                else:
+                    plt.savefig(os.path.join(out_path, 'v_%d.png' %(i + 1)), bbox_inches='tight', pad_inches = 0)
+
                 plt.close(fig)
 
             
@@ -426,8 +443,11 @@ def eval_AANetNet():
 
     print('\n')
 
-    if not args.sample:
-        run_cvt_images_to_overlays(args.video_name, cfg['paths'][cfg_dataset], setting_prefix, eval_size)
+    if args.sample:
+        mask_folder = args.video_name + '_full'
+    else:
+        mask_folder = args.video_name
+    run_cvt_images_to_overlays(args.video_name, mask_folder, cfg['paths'][cfg_dataset], setting_prefix, eval_size)
 
     print('\n')
     

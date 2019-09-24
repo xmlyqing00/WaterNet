@@ -31,11 +31,7 @@ def cvt_object_label(img, ori_label_color, dst_label_color=None):
 
 if __name__ == '__main__':
 
-<<<<<<< HEAD
     video_name = 'aberlour'
-=======
-    video_name = 'holmrook'
->>>>>>> 21f1fc0596ee32d2381d6cfb856d3b9ca17da82b
     folder = os.path.join('/Ship01/Dataset/water/collection/test_annots/', video_name)
     
     # labelme_json_to_dataset
