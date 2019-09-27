@@ -28,7 +28,7 @@ one_tensor = torch.ones(1).to(device)
 zero_tensor = torch.zeros(1).to(device)
 
 # Hyper parameters
-erosion_bg_factor = 1
+erosion_bg_factor = 1.3
 
 def split_mask(mask, split_thres, erosion_iters):
 
@@ -98,6 +98,14 @@ def compute_similarity(cur_feature, feature_templates, shape_s, shape_l, topk=20
     return scores
 
 
+def adjust_rates(idx, l0, l1, l2):
+
+    if idx % 10 == 0:
+        l0 *= 0.9
+    l1 = 1 - l0 - l2
+
+    return l0, l1, l2
+
 def eval_AANetNet():
     
     torch.set_printoptions(precision=3, threshold=30000, linewidth=160, sci_mode=False)
@@ -152,10 +160,10 @@ def eval_AANetNet():
     
     # Hyper parameters 2
     water_thres = 0.5
-    l0, l1, l2 = 0.1, 0.4, 0.5
+    l0, l1, l2 = 0.4, 0.2, 0.4
     if args.no_conf:
-        l0, l1 = 0.3, 0.7
-    l_aa = 0.5
+        l0, l1, l2 = 0.67, 0.33, 0
+    l_aa = 0.9
 
     # Dataset
     dataset_args = {}
@@ -272,6 +280,9 @@ def eval_AANetNet():
             f3 = F.interpolate(f3, size=f1.shape[-2:], mode='bilinear', align_corners=False)
             feature_map = torch.cat((f1, f2, f3), 1)
 
+            l0, l1, l2 = adjust_rates(i + 1, l0, l1, l2)
+            # print(i, l0, l1, l2)
+
             if not args.no_aa:
 
                 feature_map = feature_map.detach().squeeze(0)
@@ -295,6 +306,15 @@ def eval_AANetNet():
                     scores_bg = compute_similarity(cur_feature, t_bg_temporal, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
                 else:
                     scores_bg = torch.zeros(img.shape[2:]).to(device)
+
+                # For visualization
+                if i == 24:
+                    print(scores_obj.shape, scores_bg.shape)
+                    tmp_img = TF.to_pil_image(scores_obj.squeeze(0).cpu())
+                    tmp_img.save(f'tmp/obj_{i}.png')
+                    tmp_img = TF.to_pil_image(scores_bg.squeeze(0).cpu())
+                    tmp_img.save(f'tmp/bg_{i}.png')
+
                 seg_temporal = (((scores_obj - scores_bg) + 1) / 2).squeeze(1)
                 val_min = seg_temporal.min()
                 seg_temporal = (seg_temporal - val_min) / (seg_temporal.max() - val_min)
@@ -313,6 +333,7 @@ def eval_AANetNet():
                         scores_bg = compute_similarity(cur_feature, t_bg_conf, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
                     else:
                         scores_bg = torch.zeros(img.shape[2:]).to(device)
+                    
                     seg_conf = (((scores_obj - scores_bg) + 1) / 2).squeeze(1)
                     val_min = seg_conf.min()
                     seg_conf = (seg_conf - val_min) / (seg_conf.max() - val_min)
@@ -321,7 +342,7 @@ def eval_AANetNet():
                 else:
                     seg_aa = l0 * seg_first + l1 * seg_temporal
 
-                seg_aa = torch.where(seg_aa > 0.5, one_tensor, zero_tensor)    
+                # seg_aa = torch.where(seg_aa > 0.5, one_tensor, zero_tensor)    
                 seg_final = l_aa * seg_aa + (1 - l_aa) * seg_fcn
             else:
                 seg_final = seg_fcn
@@ -389,10 +410,10 @@ def eval_AANetNet():
 
                 seg_conf = TF.to_pil_image(seg_conf.squeeze(0).cpu())
                 axes[0][2].imshow(seg_conf, cmap='gray', interpolation='nearest', vmin=0, vmax=255)
+                axes[0][2].set_title('(c) seg by confidence area')
 
                 seg_aa = TF.to_pil_image(seg_aa.squeeze(0).cpu())
                 axes[1][0].imshow(seg_aa, cmap='gray', interpolation='nearest', vmin=0, vmax=255)
-
                 axes[1][0].set_title('(d) seg by water branch')
 
                 seg_fcn = TF.to_pil_image(seg_fcn.squeeze(0).cpu())

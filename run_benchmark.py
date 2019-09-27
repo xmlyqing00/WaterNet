@@ -20,7 +20,7 @@ def run_benchmark():
     print('Seq names:', sequences_names)
 
     for seq in sequences_names:
-        cmd = f'python3 eval_AANet.py -c=models/cp_AANet_199.pth.tar -v {seq}'
+        cmd = f'python3 eval_AANet.py --no-conf -c=models/cp_AANet_199.pth.tar -v {seq}'
         if seq not in full_videos:
             cmd += sample_flag
         os.system(cmd)
