@@ -91,6 +91,7 @@ def split_features(feature_map, mask, split_thres=0.5, erosion_iters=0):
 def compute_similarity(cur_feature, feature_templates, shape_s, shape_l, topk=20):
 
     similarity_scores = cur_feature.matmul(feature_templates) # Size: (h*w, m0)
+    # print(similarity_scores.max(), similarity_scores.min())
     topk_scores = similarity_scores.topk(k=topk, dim=1, largest=True)
     avg_scores = topk_scores.values.mean(dim=1).reshape(1, 1, shape_s[0], shape_s[1])
     scores = F.interpolate(avg_scores, shape_l, mode='bilinear', align_corners=False)
@@ -292,7 +293,7 @@ def eval_AANetNet():
                 # Seg first frame features
                 scores_obj = compute_similarity(cur_feature, t_obj_first, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
                 scores_bg = compute_similarity(cur_feature, t_bg_first, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
-                seg_first = (((scores_obj - scores_bg) + 1) / 2).squeeze(1)
+                seg_first = ((scores_obj - scores_bg + 2) / 4).squeeze(1)
                 val_min = seg_first.min()
                 seg_first = (seg_first - val_min) / (seg_first.max() - val_min)
 
@@ -308,14 +309,14 @@ def eval_AANetNet():
                     scores_bg = torch.zeros(img.shape[2:]).to(device)
 
                 # For visualization
-                if i == 24:
-                    print(scores_obj.shape, scores_bg.shape)
-                    tmp_img = TF.to_pil_image(scores_obj.squeeze(0).cpu())
-                    tmp_img.save(f'tmp/obj_{i}.png')
-                    tmp_img = TF.to_pil_image(scores_bg.squeeze(0).cpu())
-                    tmp_img.save(f'tmp/bg_{i}.png')
+                # if i == 24:
+                #     print(scores_obj.shape, scores_bg.shape)
+                #     tmp_img = TF.to_pil_image(scores_obj.squeeze(0).cpu())
+                #     tmp_img.save(f'tmp/obj_{i}.png')
+                #     tmp_img = TF.to_pil_image(scores_bg.squeeze(0).cpu())
+                #     tmp_img.save(f'tmp/bg_{i}.png')
 
-                seg_temporal = (((scores_obj - scores_bg) + 1) / 2).squeeze(1)
+                seg_temporal = ((scores_obj - scores_bg + 2) / 4).squeeze(1)
                 val_min = seg_temporal.min()
                 seg_temporal = (seg_temporal - val_min) / (seg_temporal.max() - val_min)
 
@@ -334,7 +335,7 @@ def eval_AANetNet():
                     else:
                         scores_bg = torch.zeros(img.shape[2:]).to(device)
                     
-                    seg_conf = (((scores_obj - scores_bg) + 1) / 2).squeeze(1)
+                    seg_conf = ((scores_obj - scores_bg + 2) / 4).squeeze(1)
                     val_min = seg_conf.min()
                     seg_conf = (seg_conf - val_min) / (seg_conf.max() - val_min)
 
@@ -362,7 +363,7 @@ def eval_AANetNet():
                     # print('Removed old temporal templates.\t', t_obj_temporal.shape[1], t_bg_temporal.shape[1])
 
                 # Add current features to template features
-                cur_features_obj, cur_features_bg = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r1']))
+                cur_features_obj, cur_features_bg = split_features(feature_map, pre_frame_mask, split_thres=float(cfg['params_AA']['hc']), erosion_iters=int(cfg['params_AA']['r1']))
                 # print('cur features:\t', 'obj:', cur_features_obj.shape, 'bg:', cur_features_bg.shape)
                 t_obj_temporal = torch.cat((t_obj_temporal, cur_features_obj), dim=1)
                 t_bg_temporal = torch.cat((t_bg_temporal, cur_features_bg), dim=1)
@@ -381,16 +382,14 @@ def eval_AANetNet():
             #     'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\r'.format(
             #     i + 1, len(eval_loader), running_time=running_time))
             
+            seg_final = TF.to_pil_image(seg_final.squeeze(0).cpu())
             if args.sample:
-                seg_final = TF.to_pil_image(seg_final.squeeze(0).cpu())
                 seg_final.save(os.path.join(out_full_path, f'{i + 1}.png'))
 
                 if i + 1 in [1, 50, 100, 150, 199]:
-                    # seg_final = TF.to_pil_image(seg_final.squeeze(0).cpu())
                     seg_final.save(os.path.join(out_path, f'{i + 1}.png'))        
             
             else:
-                seg_final = TF.to_pil_image(seg_final.squeeze(0).cpu())
                 seg_final.save(os.path.join(out_path, f'{i + 1}.png'))        
 
             if args.verbose:

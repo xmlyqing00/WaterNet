@@ -5,6 +5,7 @@ import time
 import configparser
 import torch
 from torch.utils import model_zoo
+from tqdm import tqdm
 
 from src.network import OSVOSNet
 from src.dataset import WaterDataset_RGB
@@ -142,7 +143,7 @@ def train_OSVOSNet():
     if args.online:
         training_mode = 'Online'
 
-    for epoch in range(start_epoch, args.total_epochs):
+    for epoch in tqdm(range(start_epoch, args.total_epochs)):
         
         losses = AverageMeter()
         batch_time = AverageMeter()
@@ -160,9 +161,10 @@ def train_OSVOSNet():
             lr = param_group['lr']
             break
             
-        print('\n=== {0} Training Epoch: [{1:4}/{2:4}]\tlr: {3:.8f} ==='.format(
-            training_mode, epoch, args.total_epochs - 1, lr
-        ))
+        if not args.online:
+            print('\n=== {0} Training Epoch: [{1:4}/{2:4}]\tlr: {3:.8f} ==='.format(
+                training_mode, epoch, args.total_epochs - 1, lr
+            ))
 
         for i, sample in enumerate(train_loader):
 
@@ -181,7 +183,7 @@ def train_OSVOSNet():
 
             losses.update(loss.item())
 
-            if (i + 1) % 10 == 0 or (i + 1) == len(train_loader):
+            if not args.online and (i + 1) == len(train_loader):
 
                 batch_time.update(time.time() - batch_endtime)
                 batch_endtime = time.time()
@@ -199,11 +201,12 @@ def train_OSVOSNet():
         epoch_time.update(time.time() - epoch_endtime)
         epoch_endtime = time.time()
 
-        print('Time: {epoch_time.val:.0f}s ({epoch_time.sum:.0f}s)  \t'
-              'Avg loss: {loss.avg:.4f}'.format(
-              epoch_time=epoch_time, loss=losses))
+        if not args.online:
+            print('Time: {epoch_time.val:.0f}s ({epoch_time.sum:.0f}s)  \t'
+                'Avg loss: {loss.avg:.4f}'.format(
+                epoch_time=epoch_time, loss=losses))
 
-        if (epoch + 1) % 10 == 0 or (i + 1) == args.total_epochs:
+        if (epoch + 1) == args.total_epochs:
             suffix = ''
             if args.online:
                 suffix = '_' + args.video_name
@@ -218,7 +221,7 @@ def train_OSVOSNet():
                 f=model_path
             )
             
-            print('Model saved.')
+            # print('Model saved.')
 
 if __name__ == '__main__':
     train_OSVOSNet()

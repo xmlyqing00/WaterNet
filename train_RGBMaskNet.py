@@ -5,6 +5,7 @@ import time
 import configparser
 import torch
 from torch.utils import model_zoo
+from tqdm import tqdm
 
 from src.network import RGBMaskNet
 from src.dataset import WaterDataset_RGBMask
@@ -146,7 +147,7 @@ def train_RGBMaskNet():
     if args.online:
         training_mode = 'Online'
 
-    for epoch in range(start_epoch, args.total_epochs):
+    for epoch in tqdm(range(start_epoch, args.total_epochs)):
         
         losses = AverageMeter()
         batch_time = AverageMeter()
@@ -193,7 +194,7 @@ def train_RGBMaskNet():
               'Avg loss: {loss.avg:.4f}'.format(
               epoch_time=epoch_time, loss=losses))
 
-        if (epoch + 1) % 10 == 0 or (i + 1) == args.total_epochs:
+        if (i + 1) == args.total_epochs:
             suffix = ''
             if args.online:
                 suffix = '_' + args.video_name

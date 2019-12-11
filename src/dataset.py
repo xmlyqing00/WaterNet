@@ -34,12 +34,12 @@ class WaterDataset(data.Dataset):
             print('Initialize offline training dataset:')
 
             for sub_folder in water_subdirs:
-                img_path = os.path.join(dataset_path, 'imgs/', sub_folder)
+                img_path = os.path.join(dataset_path, 'training_imgs/', sub_folder)
                 img_list = os.listdir(img_path)
                 img_list.sort(key = lambda x: (len(x), x))
                 self.img_list += [os.path.join(img_path, name) for name in img_list]
 
-                label_path = os.path.join(dataset_path, 'labels/', sub_folder)
+                label_path = os.path.join(dataset_path, 'training_labels/', sub_folder)
                 label_list = os.listdir(label_path)
                 label_list.sort(key = lambda x: (len(x), x))
                 self.label_list += [os.path.join(label_path, name) for name in label_list]
@@ -266,9 +266,9 @@ class WaterDataset_PFD(WaterDataset):
 
 class WaterDataset_RGBMask(WaterDataset):
 
-    def __init__(self, mode, dataset_path, input_size=None, test_case=None):
+    def __init__(self, mode, dataset_path, input_size=None, test_case=None, eval_size=None):
 
-        super(WaterDataset_RGBMask, self).__init__(mode, dataset_path, input_size, test_case)
+        super(WaterDataset_RGBMask, self).__init__(mode, dataset_path, input_size, test_case, eval_size)
 
     def __getitem__(self, index):
         
@@ -285,6 +285,8 @@ class WaterDataset_RGBMask(WaterDataset):
 
         elif self.mode == 'eval':
             img = load_image_in_PIL(self.img_list[index]).convert('RGB')
+            if self.eval_size:
+                img = img.resize(self.eval_size, Image.ANTIALIAS)
             sample = self.apply_transforms(img)
             return sample
 

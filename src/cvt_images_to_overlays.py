@@ -109,10 +109,10 @@ def run_add_mask_to_image():
 
 if __name__ == '__main__':
     
-    root_folder = '/Ship01/Dataset/water/collection/'
+    root_folder = '/Ship01/Dataset/water/'
     video_name_set = ['canal0', 'stream0', 'stream1', 'stream3_small', 'stream4', 'buffalo0_small', 'boston_harbor2_small_rois']
-    model_name = 'FEELVOS'
+    model_name = 'RGMP'
 
     for video_folder in video_name_set:
-        run_cvt_images_to_overlays(video_folder, root_folder, model_name)
+        run_cvt_images_to_overlays(video_folder, video_folder, root_folder, model_name)
     # run_add_mask_to_image()

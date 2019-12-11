@@ -8,6 +8,7 @@ import torch
 import configparser
 import torchvision.transforms.functional as TF
 from PIL import Image
+from tqdm import tqdm
 
 from src.network import OSVOSNet
 from src.dataset import WaterDataset_RGB
@@ -39,11 +40,14 @@ def eval_OSVOSNetNet():
         '-m', '--model-name', default='OSVOSNet', type=str,
         help='Model name for the ouput segmentation, it will create a subfolder under the out_folder.')
     parser.add_argument(
-        '-o', '--out-folder', default=cfg['paths'][cfg_dataset], type=str, metavar='PATH',
+        '-o', '--out-folder', default=os.path.join(cfg['paths'][cfg_dataset], 'results/'), type=str, metavar='PATH',
         help='Folder for the output segmentations.')
     parser.add_argument(
         '-b', '--benchmark', action='store_true',
         help='Evaluate the video with groundtruth.')
+    parser.add_argument(
+        '--sample', action='store_true',
+        help='The video sequence has been sampled.')
     args = parser.parse_args()
 
     print('Args:', args)
@@ -70,7 +74,8 @@ def eval_OSVOSNetNet():
     dataset = WaterDataset_RGB(
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
-        test_case=args.video_name
+        test_case=args.video_name,
+        eval_size=(int(cfg['params_OSVOS']['eval_w']), int(cfg['params_OSVOS']['eval_h']))
     )
     eval_loader = torch.utils.data.DataLoader(
         dataset=dataset,
@@ -101,6 +106,11 @@ def eval_OSVOSNetNet():
     if not os.path.exists(out_path):
         os.makedirs(out_path)
 
+    if args.sample:
+        out_full_path = out_path + '_full'
+        if not os.path.exists(out_full_path):
+            os.makedirs(out_full_path)
+
     # Start testing
     OSVOS_net.to(device).eval()
     running_time = AverageMeter()
@@ -108,8 +118,11 @@ def eval_OSVOSNetNet():
     
     # First frame annotation
     pre_frame_mask = dataset.get_first_frame_label()
+    eval_size = pre_frame_mask.shape[-2:]
     first_frame_seg = TF.to_pil_image(pre_frame_mask)
     first_frame_seg.save(os.path.join(out_path, '0.png'))
+    if args.sample:
+        first_frame_seg.save(os.path.join(out_full_path, '0.png'))
     pre_frame_mask = pre_frame_mask.unsqueeze(0).to(device)
     
     if args.benchmark:
@@ -120,7 +133,7 @@ def eval_OSVOSNetNet():
     avg_iou = 0
 
     with torch.no_grad():
-        for i, sample in enumerate(eval_loader):
+        for i, sample in enumerate(tqdm(eval_loader)):
 
             img = sample['img'].to(device)     
 
@@ -128,36 +141,50 @@ def eval_OSVOSNetNet():
 
             output = outputs[-1].detach()
             output = 1 / (1 + torch.exp(-output))
-            seg_raw = TF.to_pil_image(output.squeeze(0).cpu())
-            seg_raw.save(os.path.join(out_path, 'raw_%d.png' % (i + 1)))
+            # seg_raw = TF.to_pil_image(output.squeeze(0).cpu())
+            # seg_raw.save(os.path.join(out_path, 'raw_%d.png' % (i + 1)))
 
             zero_tensor = torch.zeros(output.shape).to(device)
             one_tensor = torch.ones(output.shape).to(device)
             seg_tf = torch.where(output > water_thres, one_tensor, zero_tensor)
             seg = TF.to_pil_image(seg_tf.squeeze(0).cpu())
-            seg.save(os.path.join(out_path, '%d.png' % (i + 1)))
+            
+            if args.sample:
+                seg.save(os.path.join(out_full_path, f'{i + 1}.png'))
+
+                if i + 1 in [1, 50, 100, 150, 199]:
+                    seg.save(os.path.join(out_path, f'{i + 1}.png'))        
+            
+            else:
+                seg.save(os.path.join(out_path, f'{i + 1}.png'))   
             
             running_time.update(time.time() - running_endtime)
             running_endtime = time.time()
 
-            if args.benchmark:
-                gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i])).convert('L')
-                gt_tf = TF.to_tensor(gt_seg).to(device).type(torch.int)
+            # if args.benchmark:
+            #     gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i])).convert('L')
+            #     gt_tf = TF.to_tensor(gt_seg).to(device).type(torch.int)
 
-                iou = iou_tensor(seg_tf.squeeze(0).type(torch.int), gt_tf)
-                avg_iou += iou.item()
-                print('iou:', iou.item())
+            #     iou = iou_tensor(seg_tf.squeeze(0).type(torch.int), gt_tf)
+            #     avg_iou += iou.item()
+            #     print('iou:', iou.item())
 
-            print('Segment: [{0:4}/{1:4}]\t'
-                'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
-                i + 1, len(eval_loader), running_time=running_time))
+            # print('Segment: [{0:4}/{1:4}]\t'
+            #     'Time: {running_time.val:.3f}s ({running_time.sum:.3f}s)\t'.format(
+            #     i + 1, len(eval_loader), running_time=running_time))
 
-    if args.benchmark:
-        print('total_iou:', avg_iou)
-        avg_iou /= len(eval_loader)
-        print('avg_iou:', avg_iou, 'frame_num:', len(eval_loader))
+    # if args.benchmark:
+    #     print('total_iou:', avg_iou)
+    #     avg_iou /= len(eval_loader)
+    #     print('avg_iou:', avg_iou, 'frame_num:', len(eval_loader))
 
-    run_cvt_images_to_overlays(args.video_name, args.out_folder, args.model_name)
+
+    if args.sample:
+        mask_folder = args.video_name + '_full'
+    else:
+        mask_folder = args.video_name
+    run_cvt_images_to_overlays(args.video_name, mask_folder, cfg['paths'][cfg_dataset], args.model_name, eval_size)
+
     
 if __name__ == '__main__':
     eval_OSVOSNetNet()
