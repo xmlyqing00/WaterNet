@@ -22,12 +22,13 @@ def get_sequence_list():
 
 def get_scores(method_name):
     method_str = f' --method {method_name}'
-    base_cmd = 'python3 /Ship01/Sources/VOS-evaluation/eval_waterdataset.py --update'
+    base_cmd = 'python3 /Ship01/SourcesArchives/VOS-evaluation/eval_waterdataset.py --update'
     cmd = base_cmd + method_str
     os.system(cmd)
 
 def eval_AANet(args):
 
+    
     sequence_list = get_sequence_list()
     base_cmd = 'python3 eval_AANet.py -c=models/cp_AANet_199.pth.tar'
 
@@ -40,11 +41,12 @@ def eval_AANet(args):
         method_name += '_no_conf'
     method_name += '_segs'
 
-    for seq in sequence_list:
-        cmd = base_cmd + f' -v {seq}'
-        if seq not in full_videos:
-            cmd += ' --sample '
-        os.system(cmd)
+    if not args.score:
+        for seq in sequence_list:
+            cmd = base_cmd + f' -v {seq}'
+            if seq not in full_videos:
+                cmd += ' --sample '
+            os.system(cmd)
     
     get_scores(method_name)
 
@@ -54,29 +56,33 @@ def eval_OSVOS(args):
 
     if args.no_online:
         
-        eval_cmd = 'python3 eval_OSVOSNet.py -c=models/cp_OSVOSNet_199.pth.tar --model-name=OSVOSNet'
-        for seq in sequence_list:
-            cmd = eval_cmd + f' -v {seq}'
-            if seq not in full_videos:
-                cmd += ' --sample '
-            os.system(cmd)
+        if not args.score:
+
+            eval_cmd = 'python3 eval_OSVOSNet.py -c=models/cp_OSVOSNet_199.pth.tar --model-name=OSVOSNet'
+            for seq in sequence_list:
+                cmd = eval_cmd + f' -v {seq}'
+                if seq not in full_videos:
+                    cmd += ' --sample '
+                os.system(cmd)
         
         get_scores('OSVOSNet_segs')
 
     else:
 
-        total_epochs = 230
-        train_cmd = f'python3 train_OSVOSNet.py -c=models/cp_OSVOSNet_199.pth.tar --online --total-epochs {total_epochs}'
-        eval_cmd = 'python3 eval_OSVOSNet.py --model-name=OSVOSNet_online'
+        if not args.score:
 
-        for seq in sequence_list:
-            cmd = train_cmd + f' -v{seq}'
-            os.system(cmd)
+            total_epochs = 230
+            train_cmd = f'python3 train_OSVOSNet.py -c=models/cp_OSVOSNet_199.pth.tar --online --total-epochs {total_epochs}'
+            eval_cmd = 'python3 eval_OSVOSNet.py --model-name=OSVOSNet_online'
 
-            cmd = eval_cmd + f' -v {seq}' + f' -c models/cp_OSVOSNet_{total_epochs-1}_{seq}.pth.tar'
-            if seq not in full_videos:
-                cmd += ' --sample '
-            os.system(cmd)
+            for seq in sequence_list:
+                cmd = train_cmd + f' -v{seq}'
+                os.system(cmd)
+
+                cmd = eval_cmd + f' -v {seq}' + f' -c models/cp_OSVOSNet_{total_epochs-1}_{seq}.pth.tar'
+                if seq not in full_videos:
+                    cmd += ' --sample '
+                os.system(cmd)
 
         get_scores('OSVOSNet_online_segs')
 
@@ -87,28 +93,31 @@ def eval_MSK(args):
 
     if args.no_online:
         
-        eval_cmd = 'python3 eval_RGBMaskNet.py -c=models/cp_RGBMaskNet_199.pth.tar --model-name=RGBMaskNet'
-        for seq in sequence_list:
-            cmd = eval_cmd + f' -v {seq}'
-            if seq not in full_videos:
-                cmd += ' --sample '
-            os.system(cmd)
+        if not args.score:
+            eval_cmd = 'python3 eval_RGBMaskNet.py -c=models/cp_RGBMaskNet_199.pth.tar --model-name=RGBMaskNet'
+            for seq in sequence_list:
+                cmd = eval_cmd + f' -v {seq}'
+                if seq not in full_videos:
+                    cmd += ' --sample '
+                os.system(cmd)
         
         get_scores('RGBMaskNet_segs')
 
     else:
+        
+        if not args.score:
 
-        train_cmd = 'python3 train_RGBMaskNet.py -c=models/cp_RGBMaskNet_199.pth.tar --online'
-        eval_cmd = 'python3 eval_RGBMaskNet.py --model-name=RGBMaskNet_online'
+            train_cmd = 'python3 train_RGBMaskNet.py -c=models/cp_RGBMaskNet_199.pth.tar --online'
+            eval_cmd = 'python3 eval_RGBMaskNet.py --model-name=RGBMaskNet_online'
 
-        for seq in sequence_list:
-            cmd = train_cmd + f' -v{seq}'
-            os.system(cmd)
+            for seq in sequence_list:
+                cmd = train_cmd + f' -v{seq}'
+                os.system(cmd)
 
-            cmd = eval_cmd + f' -v {seq}' + f' -c models/cp_RGBMaskNet_229_{seq}.pth.tar'
-            if seq not in full_videos:
-                cmd += ' --sample '
-            os.system(cmd)
+                cmd = eval_cmd + f' -v {seq}' + f' -c models/cp_RGBMaskNet_229_{seq}.pth.tar'
+                if seq not in full_videos:
+                    cmd += ' --sample '
+                os.system(cmd)
 
         get_scores('RGBMaskNet_online_segs')
 
@@ -119,6 +128,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--method', default=None, type=str, required=True,
         help='Input the method name (default: none).')
+    parser.add_argument(
+        '--score', action='store_true',
+        help='Compute the scores without re-run the benchmark.')
     parser.add_argument(
         '--no-conf', action='store_true', 
         help='For AANet (default: none).')

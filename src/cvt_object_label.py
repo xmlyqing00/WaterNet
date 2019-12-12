@@ -2,6 +2,7 @@ import os
 import argparse
 import numpy as np
 import cv2
+import argparse
 
 def cvt_object_label(img, ori_label_color, dst_label_color=None):
 
@@ -31,8 +32,18 @@ def cvt_object_label(img, ori_label_color, dst_label_color=None):
 
 if __name__ == '__main__':
 
-    video_name = 'aberlour'
-    folder = os.path.join('/Ship01/Dataset/water/collection/test_annots/', video_name)
+    parser = argparse.ArgumentParser(description='Convert object label')
+    parser.add_argument(
+        '--video-name', type=str, required=True,
+        help='Video name.')
+    args = parser.parse_args()
+
+    print('Args:', args)
+
+    # video_name = 'boston_harbor_20190119'
+    video_name = args.video_name
+    
+    folder = os.path.join('/Ship01/Dataset/water/test_annots/', video_name)
     
     # labelme_json_to_dataset
     name_list = os.listdir(folder)
@@ -53,42 +64,3 @@ if __name__ == '__main__':
             label_w = cvt_object_label(label, (0, 0, 128), (255, 255, 255))
 
             cv2.imwrite(os.path.join(folder, '%s.png' % frame_name[:-5]), label_w)
-
-
-    parser = argparse.ArgumentParser(description='Convert Object Label to W/B')
-    parser.add_argument(
-        '-v', type=str, default=None, help='Test video name (default: none).')
-    parser.add_argument(
-        '-v', type=str, default=None, help='Test video name (default: none).')
-    parser.add_argument(
-        '--no-temporal', action='store_true',
-        help='Evaluate the video without temporally updating templates.')
-    parser.add_argument(
-        '--no-conf', action='store_true',
-        help='Evaluate the video without high-confidence features updating templates.')
-    parser.add_argument(
-        '--no-aa', action='store_true',
-        help='Evaluate the video without appearance-adaptive branch.')
-    parser.add_argument(
-        '-b', '--benchmark', action='store_true',
-        help='Evaluate the video with groundtruth.')
-    parser.add_argument(
-        '-c', '--checkpoint', default=None, type=str, metavar='PATH',
-        help='Path to latest checkpoint (default: none).')
-    parser.add_argument(
-        '-v', '--video-name', default=None, type=str,
-        help='Test video name (default: none).')
-    parser.add_argument(
-        '-m', '--model-name', default='AANet', type=str,
-        help='Model name for the ouput segmentation, it will create a subfolder under the out_folder.')
-    parser.add_argument(
-        '-o', '--out-folder', default=cfg['paths'][cfg_dataset], type=str, metavar='PATH',
-        help='Folder for the output segmentations.')
-    args = parser.parse_args()
-
-    print('Args:', args)
-
-    if args.checkpoint is None:
-        raise ValueError('Must input checkpoint path.')
-    if args.video_name is None:
-        raise ValueError('Must input video name.')
