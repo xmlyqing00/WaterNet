@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 from datetime import datetime
 import cv2
+import argparse
 
 seg_thres = 128
 
@@ -24,12 +25,15 @@ def track_object(img_folder, overlay_folder, out_folder):
     # First frame
     frame_st = cv2.imread(os.path.join(img_folder, img_list[0]))
     overlays_st = cv2.imread(os.path.join(overlay_folder, overlays_list[0]))
-
+    print(frame_st.shape)
+    print(overlays_st.shape)
+    frame_st = cv2.resize(frame_st, (overlays_st.shape[1], overlays_st.shape[0]))
+    
     bbox_st = (768, 223, 46, 42)
-    # while True:    
-    #     bbox_st = cv2.selectROI('First Frame', frame_st, fromCenter=False)
-    #     if bbox_st[2] > 0 and bbox_st[3] > 0:
-    #         break
+    while True:    
+        bbox_st = cv2.selectROI('First Frame', frame_st, fromCenter=False)
+        if bbox_st[2] > 0 and bbox_st[3] > 0:
+            break
     x, y, w, h = [int(v) for v in bbox_st]
     cv2.rectangle(overlays_st, (x, y), (x+w, y + h), (0, 200, 0), 2)
     out_path = os.path.join(out_folder, img_list[0][:-4] + '_tag.png')
@@ -46,6 +50,7 @@ def track_object(img_folder, overlay_folder, out_folder):
 
         img = cv2.imread(os.path.join(img_folder, img_list[i]))
         overlay = cv2.imread(os.path.join(overlay_folder, overlays_list[i]))
+        img = cv2.resize(img, (overlays_st.shape[1], overlays_st.shape[0]))
 
         op_flag, bbox = tracker.update(img)
 
@@ -140,21 +145,21 @@ def get_time_arr(img_folder):
     return time_arr
 
 
-def est_waterlevel(video_name, model_name='RGBMaskNet_online'):
+def est_waterlevel(video_name, model_name='AANet'):
 
     # Paths
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
 
-    img_folder = os.path.join(cfg['paths']['dataset'], 'test_videos', video_name)
-    overlay_folder = os.path.join(cfg['paths']['dataset'], model_name + '_overlays', video_name)
-    out_folder = os.path.join(cfg['paths']['dataset'], model_name + '_overlays_bbox', video_name)
+    img_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'test_videos', video_name)
+    overlay_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'results', model_name + '_overlays', video_name)
+    out_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'results', model_name + '_overlays_bbox', video_name)
     if not os.path.exists(out_folder):
         os.makedirs(out_folder)
 
     key_pts = track_object(img_folder, overlay_folder, out_folder)
 
-    seg_folder = os.path.join(cfg['paths']['dataset'], model_name + '_segs', video_name)
+    seg_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'results', model_name + '_segs', video_name)
     cos_v, water_boundary_pts = est_water_boundary(seg_folder, out_folder, out_folder, key_pts)
 
     key_pts_y = np.array(key_pts)[:, 1]
@@ -174,7 +179,16 @@ def est_waterlevel(video_name, model_name='RGBMaskNet_online'):
 
 if __name__ == '__main__':
 
-    video_name = 'boston_harbor2'
+    parser = argparse.ArgumentParser(description='Estimate water level.')
+    parser.add_argument(
+        '--video-name', type=str, required=True,
+        help='Video name.')
+    args = parser.parse_args()
+
+    print('Args:', args)
+    video_name = args.video_name
+
+    # video_name = 'boston_harbor_20190119'
 
     est_waterlevel(video_name)
 
