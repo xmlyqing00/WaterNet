@@ -24,7 +24,7 @@ def mouse_click(event, x, y, flags, param):
         if len(pts) == pts_n:
             loop_flag = False
 
-def calib_img(img):
+def est_img_homo(img):
 
     global pts
 
@@ -51,20 +51,31 @@ def calib_img(img):
     homo_mat, _ = cv2.findHomography(pts, pts_t)   
     # print(homo_mat) 
     
-    img_warped = cv2.warpPerspective(img, homo_mat, (img.shape[1], img.shape[0]))
-    cv2.imshow('warped', img_warped)
-    cv2.waitKey()
+    # img_warped = cv2.warpPerspective(img, homo_mat, (img.shape[1], img.shape[0]))
+    # cv2.imshow('warped', img_warped)
+    # cv2.waitKey()
+
+    return homo_mat
 
 
-def calib_video(video_folder):
+
+def get_video_homo(video_folder, homo_mat_path, recalib_flag):
     
     img_list = os.listdir(video_folder)
     img_list.sort(key = lambda x: (len(x), x))
     img_st = cv2.imread(os.path.join(video_folder, img_list[0]))
 
-    calib_img(img_st)
+    if not recalib_flag:
+        try:
+            print(f'Load homo mat from {homo_mat_path}')
+            return np.load(homo_mat_path)
+        except FileNotFoundError as e: 
+            print(f'homo_mat_path: {homo_mat_path} doesn\'t exist. Estimate the video homo mat.')
 
-
+    homo_mat = est_img_homo(img_st)
+    np.save(homo_mat_path, homo_mat)
+    return homo_mat
+        
 
 if __name__ == '__main__':
 
@@ -84,4 +95,12 @@ if __name__ == '__main__':
     cfg.read('settings.conf')
 
     video_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'test_videos', args.video_name)
-    calib_video(video_folder)
+
+    homo_mat_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'test_videos/homo_mats')
+    if not os.path.exists(homo_mat_folder):
+        os.makedirs(homo_mat_folder)
+    homo_mat_path = os.path.join(homo_mat_folder, args.video_name + '.npy')
+
+    
+    
+    calib_video(video_folder, homo_mat_path, args.recalib)
