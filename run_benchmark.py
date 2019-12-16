@@ -26,13 +26,13 @@ def get_scores(method_name):
     cmd = base_cmd + method_str
     os.system(cmd)
 
-def eval_AANet(args):
+def eval_WaterNet(args):
 
     
     sequence_list = get_sequence_list()
-    base_cmd = 'python3 eval_AANet.py -c=models/cp_AANet_199.pth.tar'
+    base_cmd = 'python3 eval_WaterNet.py -c=models/cp_WaterNet_199.pth.tar'
 
-    method_name = 'AANet'
+    method_name = 'WaterNet'
     if args.no_aa:
         base_cmd += ' --no-aa'
         method_name += '_no_aa'
@@ -133,10 +133,10 @@ if __name__ == '__main__':
         help='Compute the scores without re-run the benchmark.')
     parser.add_argument(
         '--no-conf', action='store_true', 
-        help='For AANet (default: none).')
+        help='For WaterNet (default: none).')
     parser.add_argument(
         '--no-aa', action='store_true',
-        help='For AANet (default: none).')
+        help='For WaterNet (default: none).')
     parser.add_argument(
         '--no-online', action='store_true',
         help='For OSVOS and MSK (default: none).')
@@ -144,8 +144,8 @@ if __name__ == '__main__':
 
     print('Args:', args)
 
-    if args.method == 'AANet':
-        eval_AANet(args)
+    if args.method == 'WaterNet':
+        eval_WaterNet(args)
     elif args.method == 'OSVOS':
         eval_OSVOS(args)
     elif args.method == 'MSK':

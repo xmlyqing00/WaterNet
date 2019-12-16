@@ -14,8 +14,8 @@ from torch.utils import model_zoo
 from PIL import Image
 from scipy import ndimage
 
-from src.AANet.feature_net import FeatureNet
-from src.AANet.dataset import WaterDataset
+from src.WaterNet.feature_net import FeatureNet
+from src.WaterNet.dataset import WaterDataset
 
 
 device = torch.device('cpu')

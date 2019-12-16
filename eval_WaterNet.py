@@ -14,7 +14,7 @@ import torchvision.transforms.functional as TF
 from PIL import Image
 from scipy import ndimage
 
-from src.AANet import FeatureNet, DeconvNet
+from src.WaterNet import FeatureNet, DeconvNet
 from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
@@ -107,7 +107,7 @@ def adjust_rates(idx, l0, l1, l2):
 
     return l0, l1, l2
 
-def eval_AANetNet():
+def eval_WaterNetNet():
     
     torch.set_printoptions(precision=3, threshold=30000, linewidth=160, sci_mode=False)
     np.set_printoptions(precision=3, threshold=30000, linewidth=160, suppress=False)
@@ -122,7 +122,7 @@ def eval_AANetNet():
         cfg_dataset = 'dataset_ubuntu'
 
     # Hyper parameters
-    parser = argparse.ArgumentParser(description='PyTorch AANet Testing')
+    parser = argparse.ArgumentParser(description='PyTorch WaterNet Testing')
     parser.add_argument(
         '--no-temporal', action='store_true',
         help='Evaluate the video without temporally updating templates.')
@@ -145,7 +145,7 @@ def eval_AANetNet():
         '-v', '--video-name', default=None, type=str,
         help='Test video name (default: none).')
     parser.add_argument(
-        '-m', '--model-name', default='AANet', type=str,
+        '-m', '--model-name', default='WaterNet', type=str,
         help='Model name for the ouput segmentation, it will create a subfolder under the out_folder.')
     parser.add_argument(
         '-o', '--out-folder', default=os.path.join(cfg['paths'][cfg_dataset], 'results'), type=str, metavar='PATH',
@@ -452,7 +452,7 @@ def eval_AANetNet():
         # print(scores_path)
         # if os.path.exists(scores_path):
         #     scores_df = pd.read_csv(scores_path)
-        #     scores_df.set_index(['AANet', 'AANet_no_conf'])
+        #     scores_df.set_index(['WaterNet', 'WaterNet_no_conf'])
         # else:
         #     scores_df = pd.DataFrame({'a':None, 'b':None})
         # print(scores_df)
@@ -472,5 +472,5 @@ def eval_AANetNet():
     print('\n')
     
 if __name__ == '__main__':
-    eval_AANetNet()
+    eval_WaterNetNet()
 

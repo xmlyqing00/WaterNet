@@ -6,7 +6,7 @@ import configparser
 import torch
 from torch.utils import model_zoo
 
-from src.AANet import FeatureNet, DeconvNet
+from src.WaterNet import FeatureNet, DeconvNet
 from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 
@@ -19,7 +19,7 @@ def adjust_learning_rate(optimizer, start_lr, epoch):
         param_group['lr'] = lr
 
 
-def train_AANet():
+def train_WaterNet():
 
     # Paths
     cfg = configparser.ConfigParser()
@@ -31,7 +31,7 @@ def train_AANet():
         cfg_dataset = 'dataset_ubuntu'
 
     # Hyper parameters
-    parser = argparse.ArgumentParser(description='PyTorch AANet Training')
+    parser = argparse.ArgumentParser(description='PyTorch WaterNet Training')
     parser.add_argument(
         '--total-epochs', default=int(cfg['params_AA']['total_epochs']), type=int, metavar='N',
         help='Number of total epochs to run (default 100).')
@@ -184,7 +184,7 @@ def train_AANet():
 
         if (epoch + 1) % 10 == 0 or (i + 1) == args.total_epochs:
             suffix = ''
-            model_path = os.path.join(cfg['paths']['models'], 'cp_AANet_{0}{1}.pth.tar'.format(epoch, suffix))
+            model_path = os.path.join(cfg['paths']['models'], 'cp_WaterNet_{0}{1}.pth.tar'.format(epoch, suffix))
             torch.save(
                 obj={
                     'epoch': epoch,
@@ -200,4 +200,4 @@ def train_AANet():
             print('Model saved.')
 
 if __name__ == '__main__':
-    train_AANet()
+    train_WaterNet()

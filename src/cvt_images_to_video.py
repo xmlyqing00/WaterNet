@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import os
+from tqdm import tqdm
 
 def cvt_images_to_video(image_folder,
                         video_path,
@@ -18,28 +19,31 @@ def cvt_images_to_video(image_folder,
     video = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
 
     stride = max(0, int(stride))
-    for image_idx in range(0, len(image_list), stride):
+    for image_idx in tqdm(range(0, len(image_list), stride)):
 
         image_path = os.path.join(image_folder, image_list[image_idx])
         image = cv2.imread(image_path)
         video.write(image)
         
-        print("Write", image_path)
+        # print("Write", image_path)
 
     video.release()
+
+    print(f'Save to {video_path}')
     
 
 if __name__ == '__main__':
     
-    root_folder = '/Ship01/Dataset/water/collection/'
-    test_name = 'boston_harbor4'
-    method = 'RGBMaskNet_online'
-    image_folder = os.path.join(root_folder, method + '_overlays_bbox/', test_name)
+    root_folder = '/Ship01/Dataset/water/results/'
+    method = 'WaterNet'
+    video_name = 'boston_harbor_20190121'
+    
+    image_folder = os.path.join(root_folder, method + '_overlays_bbox/', video_name)
     video_folder = os.path.join(root_folder, method + '_videos/')
     if not os.path.exists(video_folder):
         os.makedirs(video_folder)
 
-    video_path = os.path.join(video_folder, test_name + '.mp4')
+    video_path = os.path.join(video_folder, video_name + '.mp4')
     fps = 10
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     stride = 1

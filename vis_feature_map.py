@@ -12,7 +12,7 @@ import torchvision.transforms.functional as TF
 import matplotlib.pyplot as plt
 from PIL import Image
 
-from src.AANet import FeatureNet
+from src.WaterNet import FeatureNet
 from src.dataset import WaterDataset_RGB
 
 def diff_feature_map(feature_map0, feature_map1):
