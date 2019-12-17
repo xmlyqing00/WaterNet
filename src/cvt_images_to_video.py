@@ -36,7 +36,7 @@ if __name__ == '__main__':
     
     root_folder = '/Ship01/Dataset/water/results/'
     method = 'WaterNet'
-    video_name = 'boston_harbor_20190121'
+    video_name = 'boston_harbor_20190119_20190123_day'
     
     image_folder = os.path.join(root_folder, method + '_overlays_bbox/', video_name)
     video_folder = os.path.join(root_folder, method + '_videos/')

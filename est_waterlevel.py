@@ -27,9 +27,9 @@ ticker_locator = mdates.HourLocator(interval=tick_spacing)
 
 register_matplotlib_converters()
 
-def track_object(img_folder, overlay_folder, out_folder, homo_mat, sample_iter=0):
+def track_object(img_folder, overlay_folder, out_folder, homo_mat, sample_iter=0, bbox_st=None):
 
-    tracker = cv2.TrackerKCF_create()
+    tracker = cv2.TrackerCSRT_create()
 
     img_list = os.listdir(img_folder)
     img_list.sort(key = lambda x: (len(x), x))
@@ -56,20 +56,22 @@ def track_object(img_folder, overlay_folder, out_folder, homo_mat, sample_iter=0
         overlay_st = cv2.warpPerspective(overlay_st, homo_out_mat, img_size)
     
     # bbox_st = (768, 223, 46, 42)
-    # Boston harbor bbox {(241, 38, 22, 10), (309, 52, 34, 22), (516, 77, 13, 35)}
-    while True:    
-        bbox_st = cv2.selectROI('First Frame', frame_st, fromCenter=False)
-        if bbox_st[2] > 0 and bbox_st[3] > 0:
-            break
+    # Boston harbor bbox =  ((241, 38, 22, 10), (309, 52, 34, 22), (516, 77, 13, 35))
+    if bbox_st is None:
+        while True:    
+            bbox_st = cv2.selectROI('First Frame', frame_st, fromCenter=False)
+            if bbox_st[2] > 0 and bbox_st[3] > 0:
+                break
     x, y, w, h = [int(v) for v in bbox_st]
     cv2.rectangle(overlay_st, (x, y), (x+w, y + h), (0, 200, 0), 2)
     out_path = os.path.join(out_folder, img_list[0][:-4] + '_tag.png')
     cv2.imwrite(out_path, overlay_st)
 
+    print('Init', bbox_st)
+
     tracker.init(frame_st, bbox_st)
     bbox_old = bbox_st
-    
-    print('Init', bbox_st)
+
 
     key_pts = [(int(x + w/2), int(y + h))]
 
@@ -101,7 +103,7 @@ def track_object(img_folder, overlay_folder, out_folder, homo_mat, sample_iter=0
 
         key_pts.append((int(x + w/2), int(y + h)))
     
-    return key_pts, homo_out_mat
+    return key_pts, homo_out_mat, bbox_st
         
 
 def est_water_boundary(seg_folder, out_folder, key_pts, homo_mat):
@@ -158,7 +160,7 @@ def get_time_arr(img_folder):
     return time_arr
 
 
-def est_waterlevel(video_name, dataset_folder, recalib_flag, sample_times=1, model_name='WaterNet'):
+def est_waterlevel(video_name, dataset_folder, recalib_flag, reref_flag, sample_times=1, model_name='WaterNet'):
 
     img_folder = os.path.join(dataset_folder, 'test_videos', video_name)
     overlay_folder = os.path.join(dataset_folder, 'results', model_name + '_overlays', video_name)
@@ -182,6 +184,14 @@ def est_waterlevel(video_name, dataset_folder, recalib_flag, sample_times=1, mod
     fig = plt.figure(figsize=(20, 10))
     ax = fig.add_subplot(111)
 
+    ref_bbox_path = os.path.join(water_level_folder, 'ref_bbox.npy')
+    if not reref_flag:
+        print('Load bbox of the reference objects.', ref_bbox_path)
+        ref_bbox = np.load(ref_bbox_path)
+        sample_times = ref_bbox.shape[0]
+    else:
+        ref_bbox = []
+
     for sample_iter in range(sample_times):
         
         print(f'Estimate water level by reference {sample_iter}')
@@ -189,7 +199,11 @@ def est_waterlevel(video_name, dataset_folder, recalib_flag, sample_times=1, mod
         if sample_iter > 0:
             overlay_folder = out_folder
         # Get points of reference objs
-        key_pts, homo_out_mat = track_object(img_folder, overlay_folder, out_folder, homo_mat, sample_iter)
+        if reref_flag:
+            key_pts, homo_out_mat, bbox_st = track_object(img_folder, overlay_folder, out_folder, homo_mat, sample_iter)
+            ref_bbox.append(bbox_st)
+        else:
+            key_pts, homo_out_mat, bbox_st = track_object(img_folder, overlay_folder, out_folder, homo_mat, sample_iter, tuple(ref_bbox[sample_iter]))
         
         seg_folder = os.path.join(dataset_folder, 'results', model_name + '_segs', video_name)
         water_level_px = est_water_boundary(seg_folder, out_folder, key_pts, homo_out_mat)
@@ -201,15 +215,18 @@ def est_waterlevel(video_name, dataset_folder, recalib_flag, sample_times=1, mod
         else:
             water_level_px_all = np.vstack((water_level_px_all, water_level_px))
 
-        ax.plot(time_arr, water_level_px, '-', label=f'By ref {sample_iter+1}')
+        ax.plot(time_arr, water_level_px, '-', label=f'By ref {sample_iter+1} (px)')
         # plt.gca().xaxis.set_major_formatter(time_fmt)
         # plt.show()
 
         # water_level_path = os.path.join(water_level_folder, f'ref{sample_iter}.png')
         # plt.savefig(water_level_path, dpi=300)
 
+    if reref_flag:
+        np.save(ref_bbox_path, np.array(ref_bbox))
+
     if sample_times > 1:
-        ax.plot(time_arr, water_level_px_all.mean(0), label=f'Avg')
+        ax.plot(time_arr, water_level_px_all.mean(0), label=f'Avg (px)')
     else:
         water_level_px_all = np.expand_dims(water_level_px_all, axis=0)
     water_level_path = os.path.join(water_level_folder, 'water_level_px.npy')
@@ -221,7 +238,8 @@ def est_waterlevel(video_name, dataset_folder, recalib_flag, sample_times=1, mod
     ax.xaxis.set_major_formatter(time_fmt)
     ax.xaxis.set_major_locator(ticker_locator)
     plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
-    ax.legend()
+    ax.legend(loc='lower right')
+
     water_level_path = os.path.join(water_level_folder, 'water_level_px.png')
     fig.savefig(water_level_path, dpi=300)
 
@@ -251,17 +269,17 @@ def plot_hydrograph(water_level_folder):
     ax = fig.add_subplot(111)
 
     for i in range(water_level_px_all.shape[0]):
-        ax.plot(time_arr_eval, water_level_px_all[i, :], label=f'By ref {i}')
+        ax.plot(time_arr_eval, water_level_px_all[i, :], label=f'By ref {i} (px)')
 
     if water_level_px_all.shape[0] > 1:
-        ax.plot(time_arr_eval, water_level_px_all.mean(0), label=f'Avg')
+        ax.plot(time_arr_eval, water_level_px_all.mean(0), label=f'Avg (px)')
 
-    ax.plot(time_arr_gt, gt_csv.iloc[:, 4], label=f'Groundtruth')
+    ax.plot(time_arr_gt, gt_csv.iloc[:, 4], label=f'Groundtruth (ft)')
 
     ax.xaxis.set_major_locator(ticker_locator)
     ax.xaxis.set_major_formatter(time_fmt)
     plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
-    ax.legend()
+    ax.legend(loc='lower right')
 
     water_level_path = os.path.join(water_level_folder, 'water_level_px_all.png')
     fig.savefig(water_level_path, dpi=300)
@@ -271,16 +289,16 @@ def plot_hydrograph(water_level_folder):
     ax = fig.add_subplot(111)
 
     if water_level_px_all.shape[0] > 1:
-        ax.plot(time_arr_eval, water_level_px_all.mean(0), label=f'Avg')
+        ax.plot(time_arr_eval, water_level_px_all.mean(0), label=f'Avg (px)')
     else:
-        ax.plot(time_arr_eval, water_level_px_all[0, :], label=f'By ref 0')
+        ax.plot(time_arr_eval, water_level_px_all[0, :], label=f'By ref 0 (px)')
 
-    ax.plot(time_arr_gt, gt_csv.iloc[:, 4], label=f'Groundtruth')
+    ax.plot(time_arr_gt, gt_csv.iloc[:, 4], label=f'Groundtruth (ft)')
 
     ax.xaxis.set_major_formatter(time_fmt)
     ax.xaxis.set_major_locator(ticker_locator)
     plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
-    ax.legend()
+    ax.legend(loc='lower right')
 
     water_level_path = os.path.join(water_level_folder, 'water_level_px_cmp.png')
     fig.savefig(water_level_path, dpi=300)
@@ -298,6 +316,9 @@ if __name__ == '__main__':
     parser.add_argument(
         '--recalib', action='store_true',
         help='Recalibate the video')
+    parser.add_argument(
+        '--reref', action='store_true',
+        help='Re-pick the reference objects in the video')
     parser.add_argument(
         '--samples', type=int, default=1,
         help='Recalibate the video')
@@ -319,7 +340,7 @@ if __name__ == '__main__':
     if args.plot:
         plot_hydrograph(water_level_folder)
     else:
-        est_waterlevel(args.video_name, dataset_folder, args.recalib, sample_times = args.samples, model_name=args.model_name)
+        est_waterlevel(args.video_name, dataset_folder, args.recalib, args.reref, sample_times = args.samples, model_name=args.model_name)
         plot_hydrograph(water_level_folder)
 
     
