@@ -6,7 +6,7 @@ def print_sample_name(video_dir, sample_n):
     print('Video dir:', video_dir)
 
     img_list = os.listdir(video_dir)
-    img_list.sort(key = lambda x: (len(x), x))
+    img_list.sort(key = lambda x: (x, len(x)))
     imgs_n = len(img_list)
 
     print('%d %s' % (0, img_list[0]))
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
 
-    video_name = 'worcester'
+    video_name = 'pineapple_willy_clip1'
     root_folder = cfg['paths']['dataset_ubuntu']
     video_dir = os.path.join(root_folder, 'test_videos', video_name)
     annot_dir = os.path.join(root_folder, 'test_annots', video_name)

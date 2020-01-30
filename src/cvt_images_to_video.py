@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import os
+import argparse
 from tqdm import tqdm
 
 def cvt_images_to_video(image_folder,
@@ -36,9 +37,22 @@ if __name__ == '__main__':
     
     root_folder = '/Ship01/Dataset/water/results/'
     method = 'WaterNet'
-    video_name = 'boston_harbor_20190119_20190123_day'
+    # video_name = 'boston_harbor_20190119_20190123_day'
+
+    parser = argparse.ArgumentParser(description='Convert images to video')
+    parser.add_argument(
+        '--video-name', type=str, required=True,
+        help='Video name.')
+    parser.add_argument(
+        '--subfolder', type=str, default='_overlays',
+        help='Video name.')
+    args = parser.parse_args()
+
+    print('Args:', args)
+
+    video_name = args.video_name
     
-    image_folder = os.path.join(root_folder, method + '_overlays_bbox/', video_name)
+    image_folder = os.path.join(root_folder, method + args.subfolder, video_name)
     video_folder = os.path.join(root_folder, method + '_videos/')
     if not os.path.exists(video_folder):
         os.makedirs(video_folder)

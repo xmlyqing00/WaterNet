@@ -194,7 +194,7 @@ def train_RGBMaskNet():
               'Avg loss: {loss.avg:.4f}'.format(
               epoch_time=epoch_time, loss=losses))
 
-        if (i + 1) == args.total_epochs:
+        if (epoch + 1) == args.total_epochs:
             suffix = ''
             if args.online:
                 suffix = '_' + args.video_name

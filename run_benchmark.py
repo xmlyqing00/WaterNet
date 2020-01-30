@@ -2,12 +2,14 @@ import os
 import argparse
 
 root_folder = '/Ship01/Dataset/water/'
-full_videos = ['stream0', 'stream1', 'stream3_small', 'stream4', 'boston_harbor2_small_rois', 'buffalo0_small', 'canal0']
+full_videos = ['stream0', 'stream1', 'stream3_small', 'stream4', 'boston_harbor2_small_rois', 'buffalo0_small', 'canal0', 'mexico_beach_clip0', 'holiday_inn_clip0', 'gulf_crest', 'pineapple_willy_clip0', 'pineapple_willy_clip1']
 
+test_videos = full_videos
+list_name = 'eval_addon.txt' # 'eval_all.txt'
 
 def get_sequence_list():
     
-    with open(os.path.join(root_folder, 'eval.txt'), 'r') as f:
+    with open(os.path.join(root_folder, list_name), 'r') as f:
         tmp = f.readlines()
         sequence_list = [x.strip() for x in tmp]
     
@@ -39,12 +41,12 @@ def eval_WaterNet(args):
     if args.no_conf:
         base_cmd += ' --no-conf'
         method_name += '_no_conf'
-    method_name += '_segs'
+    # method_name += '_segs'
 
     if not args.score:
         for seq in sequence_list:
             cmd = base_cmd + f' -v {seq}'
-            if seq not in full_videos:
+            if seq not in test_videos:
                 cmd += ' --sample '
             os.system(cmd)
     
@@ -61,11 +63,11 @@ def eval_OSVOS(args):
             eval_cmd = 'python3 eval_OSVOSNet.py -c=models/cp_OSVOSNet_199.pth.tar --model-name=OSVOSNet'
             for seq in sequence_list:
                 cmd = eval_cmd + f' -v {seq}'
-                if seq not in full_videos:
+                if seq not in test_videos:
                     cmd += ' --sample '
                 os.system(cmd)
         
-        get_scores('OSVOSNet_segs')
+        get_scores('OSVOSNet')
 
     else:
 
@@ -80,11 +82,11 @@ def eval_OSVOS(args):
                 os.system(cmd)
 
                 cmd = eval_cmd + f' -v {seq}' + f' -c models/cp_OSVOSNet_{total_epochs-1}_{seq}.pth.tar'
-                if seq not in full_videos:
+                if seq not in test_videos:
                     cmd += ' --sample '
                 os.system(cmd)
 
-        get_scores('OSVOSNet_online_segs')
+        get_scores('OSVOSNet_online')
 
 
 def eval_MSK(args):
@@ -97,11 +99,11 @@ def eval_MSK(args):
             eval_cmd = 'python3 eval_RGBMaskNet.py -c=models/cp_RGBMaskNet_199.pth.tar --model-name=RGBMaskNet'
             for seq in sequence_list:
                 cmd = eval_cmd + f' -v {seq}'
-                if seq not in full_videos:
+                if seq not in test_videos:
                     cmd += ' --sample '
                 os.system(cmd)
         
-        get_scores('RGBMaskNet_segs')
+        get_scores('RGBMaskNet')
 
     else:
         
@@ -115,11 +117,11 @@ def eval_MSK(args):
                 os.system(cmd)
 
                 cmd = eval_cmd + f' -v {seq}' + f' -c models/cp_RGBMaskNet_229_{seq}.pth.tar'
-                if seq not in full_videos:
+                if seq not in test_videos:
                     cmd += ' --sample '
                 os.system(cmd)
 
-        get_scores('RGBMaskNet_online_segs')
+        get_scores('RGBMaskNet_online')
 
 
 if __name__ == '__main__':

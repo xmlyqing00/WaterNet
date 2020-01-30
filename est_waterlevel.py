@@ -18,7 +18,7 @@ from calib_video import get_video_homo
 
 seg_thres = 128
 
-time_fmt = mdates.DateFormatter('%M/%d %H:%M')
+time_fmt = mdates.DateFormatter('%m/%d %H:%M')
 # print(time_arr)
 
 tick_spacing = 4
@@ -26,6 +26,11 @@ tick_spacing = 4
 ticker_locator = mdates.HourLocator(interval=tick_spacing)
 
 register_matplotlib_converters()
+
+# Waterlevel 
+w_rate = 1/2.3
+w_bias = 7 # For boston_harbor_20190119_20190123_day
+
 
 def track_object(img_folder, overlay_folder, out_folder, homo_mat, sample_iter=0, bbox_st=None):
 
@@ -175,11 +180,18 @@ def est_waterlevel(video_name, dataset_folder, recalib_flag, reref_flag, sample_
     homo_mat_path = os.path.join(homo_mat_folder, args.video_name + '.npy')
     homo_mat = get_video_homo(img_folder, homo_mat_path, recalib_flag)
 
-    time_arr = get_time_arr(img_folder)
-
     water_level_folder = os.path.join(dataset_folder, 'water_level', model_name, video_name)
     if not os.path.exists(water_level_folder):
         os.makedirs(water_level_folder)
+    
+
+    time_arr = get_time_arr(img_folder)
+    time_arr_path = os.path.join(water_level_folder, 'time_arr.npy')
+    print(time_arr)
+    np.save(time_arr_path, np.array(time_arr))
+
+    exit(0)
+
     
     fig = plt.figure(figsize=(20, 10))
     ax = fig.add_subplot(111)
@@ -232,9 +244,6 @@ def est_waterlevel(video_name, dataset_folder, recalib_flag, reref_flag, sample_
     water_level_path = os.path.join(water_level_folder, 'water_level_px.npy')
     np.save(water_level_path, water_level_px_all)
 
-    time_arr_path = os.path.join(water_level_folder, 'time_arr.npy')
-    np.save(time_arr_path, np.array(time_arr))
-
     ax.xaxis.set_major_formatter(time_fmt)
     ax.xaxis.set_major_locator(ticker_locator)
     plt.setp(ax.get_xticklabels(), rotation=30, ha="right")
@@ -265,14 +274,16 @@ def plot_hydrograph(water_level_folder):
     gt_csv.iloc[:, 0] = gt_csv.iloc[:, 0] + ' ' + gt_csv.iloc[:, 1]
     time_arr_gt = pd.to_datetime(gt_csv.iloc[:, 0])
 
+    water_level_px_all = w_rate * water_level_px_all + w_bias
+
     fig = plt.figure(figsize=(20, 10))
     ax = fig.add_subplot(111)
 
     for i in range(water_level_px_all.shape[0]):
-        ax.plot(time_arr_eval, water_level_px_all[i, :], label=f'By ref {i} (px)')
+        ax.plot(time_arr_eval, water_level_px_all[i, :], label=f'By ref {i} (ft)')
 
     if water_level_px_all.shape[0] > 1:
-        ax.plot(time_arr_eval, water_level_px_all.mean(0), label=f'Avg (px)')
+        ax.plot(time_arr_eval, water_level_px_all.mean(0), label=f'Avg (ft)')
 
     ax.plot(time_arr_gt, gt_csv.iloc[:, 4], label=f'Groundtruth (ft)')
 
@@ -289,9 +300,9 @@ def plot_hydrograph(water_level_folder):
     ax = fig.add_subplot(111)
 
     if water_level_px_all.shape[0] > 1:
-        ax.plot(time_arr_eval, water_level_px_all.mean(0), label=f'Avg (px)')
+        ax.plot(time_arr_eval, water_level_px_all.mean(0), label=f'Estimated Waterlevel (ft)')
     else:
-        ax.plot(time_arr_eval, water_level_px_all[0, :], label=f'By ref 0 (px)')
+        ax.plot(time_arr_eval, water_level_px_all[0, :], label=f'By ref 0 (ft)')
 
     ax.plot(time_arr_gt, gt_csv.iloc[:, 4], label=f'Groundtruth (ft)')
 

@@ -99,20 +99,30 @@ def run_cvt_images_to_overlays(video_name, mask_folder, root_folder, model_name=
     # eval_size: (h, w)
     cvt_images_to_overlays(image_folder, mask_folder, output_folder, label_color, stride, frame_st, eval_size)
 
-def run_add_mask_to_image():
+def run_add_mask_to_image(root_folder, video_name, model_name):
 
-    root_folder = '/Ship01/Documents/MyPapers/FloodHydrograph/imgs'
-    image = cv2.imread(os.path.join(root_folder, '1798_original.png'))
-    mask = cv2.imread(os.path.join(root_folder, '1798_before_smoothed.png'))
-    image_mask = add_mask_to_image(image, mask, [200, 0, 0])
-    cv2.imwrite(os.path.join(root_folder, '1798_before_smoothed_overlay.png'), image_mask)
+    img_name = 'Holiday_Inn_09-10-2018-17-29-52_0.png'
+    image = cv2.imread(os.path.join(root_folder, 'test_videos',  video_name, img_name))
+    mask = cv2.imread(os.path.join(root_folder, 'results', model_name + '_segs', video_name, '00002.png'))
+    origin_shape = image.shape
+    if mask.shape != image.shape:
+        image = cv2.resize(image, (mask.shape[1], mask.shape[0]), None)
+    image_mask = add_mask_to_image(image, mask, [255, 255, 255])
+    if image_mask.shape != origin_shape:
+        image_mask = cv2.resize(image_mask, (origin_shape[1], origin_shape[0]), None)
+
+    out_folder = os.path.join(root_folder,  'results', model_name + '_overlays', video_name)
+    if not os.path.exists(out_folder):
+        os.makedirs(out_folder)
+    cv2.imwrite(os.path.join(out_folder, img_name[:-4] + '_mask.png'), image_mask)
 
 if __name__ == '__main__':
     
     root_folder = '/Ship01/Dataset/water/'
-    video_name_set = ['canal0', 'stream0', 'stream1', 'stream3_small', 'stream4', 'buffalo0_small', 'boston_harbor2_small_rois']
-    model_name = 'RGMP'
+    video_name_set = ['holiday_inn_clip0']
+    # video_name_set = ['canal0', 'stream0', 'stream1', 'stream3_small', 'stream4', 'buffalo0_small', 'boston_harbor2_small_rois']
+    model_name = 'FEELVOS'
 
     for video_folder in video_name_set:
         run_cvt_images_to_overlays(video_folder, video_folder, root_folder, model_name)
-    # run_add_mask_to_image()
+    #run_add_mask_to_image(root_folder, video_name_set[0], model_name)
