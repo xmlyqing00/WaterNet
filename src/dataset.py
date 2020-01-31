@@ -2,6 +2,7 @@ import os
 import sys
 import random
 import copy
+import glob
 import numpy as np
 import torch
 import torchvision.transforms.functional as TF
@@ -91,6 +92,11 @@ class WaterDataset(data.Dataset):
                 first_frame_label_path += 'png'
             else:
                 first_frame_label_path += 'jpg'
+
+            if not os.path.exists(first_frame_label_path):
+                label_list = glob.glob(os.path.join(dataset_path, 'test_annots/', test_case, '*.png'))
+                label_list.sort(key = lambda x: (x, len(x)))
+                first_frame_label_path = label_list[0]
 
             self.first_frame = load_image_in_PIL(self.img_list[0]).convert('RGB')
             self.img_list.pop(0)

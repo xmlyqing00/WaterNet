@@ -3,9 +3,10 @@ import argparse
 import configparser
 import math
 import copy
+import glob
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import matplotlib.dates as mdates
 from datetime import datetime
@@ -13,44 +14,40 @@ import cv2
 import argparse
 from tqdm import tqdm
 from pandas.plotting import register_matplotlib_converters
-        
+
 good_match_thres = 0.8
 min_match_count_thres = 6
 
-def select_rois(img, roi_num):
 
+def select_rois(img, roi_num):
     img_size = img.shape[:2]
     mask = np.zeros(img_size, dtype=np.uint8)
     # cv2.imshow('mask', mask)
 
     for i in range(roi_num):
-        while True:    
+        while True:
             roi_bbox = cv2.selectROI('Select ROIs', img, fromCenter=False)
             if roi_bbox[2] > 0 and roi_bbox[3] > 0:
                 break
-        
+
         x, y, w, h = [int(v) for v in roi_bbox]
         # print(roi_bbox)
-        mask[y:y+h, x:x+w] = 255
+        mask[y:y + h, x:x + w] = 255
         # cv2.imshow('mask', mask)
         # cv2.waitKey(1)
 
     return mask
 
 
-def align_imgs(img_folder, mask_folder, out_img_folder, roi_num):
-
+def align_imgs(img_folder, out_img_folder, roi_num):
     img_list = os.listdir(img_folder)
     img_list.sort(key=lambda x: (len(x), x))
-
-    mask_list = os.listdir(mask_folder)
-    mask_list.sort(key=lambda x: (len(x), x))
 
     # First frame
     img_st = cv2.imread(os.path.join(img_folder, img_list[0]))
     mask = select_rois(img_st, roi_num)
     cv2.imwrite('tmp/mask.png', mask)
-    surf = cv2.xfeatures2d.SURF_create(1000)
+    surf = cv2.xfeatures2d.SURF_create(2000)
 
     kpt_st, des_st = surf.detectAndCompute(img_st, mask)
     # img_st_kpt = cv2.drawKeypoints(img_st, kpt_st, None, (255, 0, 0), 4)
@@ -79,7 +76,11 @@ def align_imgs(img_folder, mask_folder, out_img_folder, roi_num):
             dst_pts = np.float32([kpt_st[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
 
             homo_mat, pts_mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-            homo_mat_old = homo_mat
+            if pts_mask.max() > 0:
+                homo_mat_old = homo_mat
+            else:
+                print('Use the old homo mat')
+                homo_mat = homo_mat_old
 
         else:
             print(f'Not enough matches are found - {len(good_matches)}/{min_match_count_thres}.')
@@ -91,7 +92,7 @@ def align_imgs(img_folder, mask_folder, out_img_folder, roi_num):
 
         draw_params = dict(matchColor=(0, 255, 0),  # draw matches in green color
                            singlePointColor=None,
-                           matchesMask=pts_mask.ravel().tolist(),  # draw only inliers
+                           # matchesMask=pts_mask.ravel().tolist(),  # draw only inliers
                            flags=2)
         matches_img = cv2.drawMatches(img_st, kpt_st, img_cur, kpt_cur, good_matches, None, **draw_params)
         tmp_img_path = 'tmp/matches_img_' + img_list[i]
@@ -101,14 +102,14 @@ def align_imgs(img_folder, mask_folder, out_img_folder, roi_num):
         # cv2.waitKey(0)
 
 
-def preprocessing_avg(img_folder, mask_folder, align_img_folder, out_img_folder, out_mask_folder, roi_num=4):
+def preprocessing_avg(img_folder, mask_folder, align_img_folder, out_img_folder, out_mask_folder, roi_num=2):
+    align_imgs(img_folder, align_img_folder, roi_num)
 
     if not os.path.exists(out_img_folder):
         os.makedirs(out_img_folder)
 
     img_list = os.listdir(align_img_folder)
     img_list.sort(key=lambda x: (len(x), x))
-
 
     for i in tqdm(range(1, len(img_list))):
 
@@ -126,16 +127,17 @@ def preprocessing_avg(img_folder, mask_folder, align_img_folder, out_img_folder,
         # cv2.imshow('avg', img_avg)
         # cv2.waitKey(0)
 
-
+    mask_list = glob.glob(os.path.join(mask_folder, '*.jpg'))
+    mask_list.sort(key=lambda x: (len(x), x))
+    # for mask_path in
 
 
 if __name__ == '__main__':
-
     parser = argparse.ArgumentParser(description='Estimate water level.')
     parser.add_argument(
         '--video-name', type=str, required=True,
         help='Video name.')
-   
+
     args = parser.parse_args()
 
     print('Args:', args)
