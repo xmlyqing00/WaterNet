@@ -161,10 +161,10 @@ def eval_WaterNetNet():
     
     # Hyper parameters 2
     water_thres = 0.5
-    l0, l1, l2 = 0.4, 0.2, 0.4
+    l0, l1, l2 = 0.6, 0.2, 0.2
     if args.no_conf:
         l0, l1, l2 = 0.67, 0.33, 0
-    l_aa = 0.9
+    l_aa = 0.7
 
     # Dataset
     dataset_args = {}
