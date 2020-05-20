@@ -5,7 +5,7 @@ from scipy.io import loadmat
 import numpy as np
 import cv2
 
-from cvt_object_label import cvt_object_label
+from src.cvt_object_label import cvt_object_label
 
 
 def cvt_ADE20K_to_collection(dataset_folder, dst_folder, dst_label_color):
@@ -111,7 +111,7 @@ def run_riversegs():
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
 
-    label_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'labels', 'river_segs')
+    label_folder = os.path.join(cfg['paths']['dataset_ubuntu'], 'training_labels', 'river_segs')
     label_files = os.listdir(label_folder)
 
     for label_name in label_files:

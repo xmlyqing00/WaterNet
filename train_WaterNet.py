@@ -33,10 +33,10 @@ def train_WaterNet():
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch WaterNet Training')
     parser.add_argument(
-        '--total-epochs', default=int(cfg['params_AA']['total_epochs']), type=int, metavar='N',
+        '--total-epochs', default=int(cfg['params_water']['total_epochs']), type=int, metavar='N',
         help='Number of total epochs to run (default 100).')
     parser.add_argument(
-        '--lr', default=float(cfg['params_AA']['lr']), type=float, metavar='LR', 
+        '--lr', default=float(cfg['params_water']['lr']), type=float, metavar='LR', 
         help='Initial learning rate.')
     parser.add_argument(
         '-c', '--checkpoint', default=None, type=str, metavar='PATH',
@@ -54,18 +54,18 @@ def train_WaterNet():
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': int(cfg['params_AA']['num_workers']),
-            'pin_memory': bool(cfg['params_AA']['pin_memory'])
+            'num_workers': int(cfg['params_water']['num_workers']),
+            'pin_memory': bool(cfg['params_water']['pin_memory'])
         }
 
     dataset = WaterDataset_RGB(
         mode='train_offline',
         dataset_path=cfg['paths'][cfg_dataset],
-        input_size=(int(cfg['params_AA']['input_w']), int(cfg['params_AA']['input_h']))
+        input_size=(int(cfg['params_water']['input_w']), int(cfg['params_water']['input_h']))
     )
     train_loader = torch.utils.data.DataLoader(
         dataset=dataset,
-        batch_size=int(cfg['params_AA']['batch_size']),
+        batch_size=int(cfg['params_water']['batch_size']),
         shuffle=True,
         **dataset_args
     )
@@ -113,9 +113,6 @@ def train_WaterNet():
     # Set train mode
     feature_net.train()
     deconv_net.train()
-
-    print(feature_net)
-    print(deconv_net)
 
     # Criterion
     criterion = torch.nn.BCELoss().to(device)

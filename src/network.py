@@ -273,5 +273,4 @@ if __name__ == '__main__':
     # output = mt_net(input)
     # print(output.shape)
 
-    pfd_net = PureFeatureDetectorNet()
-    print(pfd_net)
+    pass

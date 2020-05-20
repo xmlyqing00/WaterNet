@@ -42,29 +42,14 @@ def split_mask(mask, split_thres, erosion_iters):
         erosion_obj = erosion_iters
         erosion_bg = int(erosion_iters * erosion_bg_factor)
 
-        # print('erosion obj', erosion_obj, 'erosion bg', erosion_bg)
-
         obj_mask_pad = np.pad(obj_mask, ((erosion_obj, erosion_obj), (erosion_obj, erosion_obj)), 'edge')
         bg_mask_pad = np.pad(bg_mask, ((erosion_bg, erosion_bg), (erosion_bg, erosion_bg)), 'edge')
 
-        # print('obj_pad', obj_mask_pad)
-        # print('bg_pad', bg_mask_pad)
-
         center_mask_obj = ndimage.binary_erosion(obj_mask_pad, iterations=erosion_obj).astype(np.float32)
         center_mask_bg = ndimage.binary_erosion(bg_mask_pad, iterations=erosion_bg).astype(np.float32)
-        
-        # print('obj_erosion', center_mask_obj)
-        # print('bg_erosion', center_mask_bg)
 
         center_mask_obj = center_mask_obj[erosion_obj: erosion_obj + obj_mask.shape[0], erosion_obj: erosion_obj + obj_mask.shape[1]]
         center_mask_bg = center_mask_bg[erosion_bg: erosion_bg + bg_mask.shape[0], erosion_bg: erosion_bg + bg_mask.shape[1]]
-
-        # print('obj_before', obj_mask)
-        # print('obj_crop', center_mask_obj)
-        # print('')
-        # print('bg_crop', center_mask_bg)
-        # print('bg_before', bg_mask)
-
 
         obj_mask = torch.tensor(center_mask_obj, device=device).unsqueeze(0).unsqueeze(0)
         bg_mask = torch.tensor(center_mask_bg, device=device).unsqueeze(0).unsqueeze(0)
@@ -161,24 +146,24 @@ def eval_WaterNetNet():
     
     # Hyper parameters 2
     water_thres = 0.5
-    l0, l1, l2 = 0.6, 0.2, 0.2
+    l0, l1, l2 = 0.4, 0.2, 0.4
     if args.no_conf:
         l0, l1, l2 = 0.67, 0.33, 0
-    l_aa = 0.7
+    l_aa = 0.5
 
     # Dataset
     dataset_args = {}
     if torch.cuda.is_available():
         dataset_args = {
-            'num_workers': 1, # int(cfg['params_AA']['num_workers']),
-            'pin_memory': False # bool(cfg['params_AA']['pin_memory'])
+            'num_workers': int(cfg['params_water']['num_workers']),
+            'pin_memory': bool(cfg['params_water']['pin_memory'])
         }
 
     dataset = WaterDataset_RGB(
         mode='eval',
         dataset_path=cfg['paths'][cfg_dataset], 
         test_case=args.video_name,
-        eval_size=(int(cfg['params_AA']['eval_w']), int(cfg['params_AA']['eval_h']))
+        eval_size=(int(cfg['params_water']['eval_w']), int(cfg['params_water']['eval_h']))
     )
     
     eval_loader = torch.utils.data.DataLoader(
@@ -264,9 +249,9 @@ def eval_WaterNetNet():
 
     print('First frame features.\t', 'obj:', t_obj_first.shape, 'bg:', t_bg_first.shape)
 
-    keep_features_n = int(cfg['params_AA']['temporal_n'])
+    keep_features_n = int(cfg['params_water']['temporal_n'])
 
-    print('Erosion params.\t', 'Conf:', int(cfg['params_AA']['r0']), 'Temporal:', int(cfg['params_AA']['r1']))
+    print('Erosion params.\t', 'Conf:', int(cfg['params_water']['r0']), 'Temporal:', int(cfg['params_water']['r1']))
     print('\n')
 
     with torch.no_grad():
@@ -291,20 +276,20 @@ def eval_WaterNetNet():
                 cur_feature = feature_map.reshape((c, feature_n)).transpose(0, 1)
 
                 # Seg first frame features
-                scores_obj = compute_similarity(cur_feature, t_obj_first, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
-                scores_bg = compute_similarity(cur_feature, t_bg_first, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
+                scores_obj = compute_similarity(cur_feature, t_obj_first, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
+                scores_bg = compute_similarity(cur_feature, t_bg_first, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
                 seg_first = ((scores_obj - scores_bg + 2) / 4).squeeze(1)
                 val_min = seg_first.min()
                 seg_first = (seg_first - val_min) / (seg_first.max() - val_min)
 
                 # Seg temporal features 
-                if t_obj_temporal.shape[1] > int(cfg['params_AA']['topk']):
-                    scores_obj = compute_similarity(cur_feature, t_obj_temporal, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
+                if t_obj_temporal.shape[1] > int(cfg['params_water']['topk']):
+                    scores_obj = compute_similarity(cur_feature, t_obj_temporal, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
                 else:
                     scores_obj = torch.zeros(img.shape[2:]).to(device)
                 
-                if t_bg_temporal.shape[1] > int(cfg['params_AA']['topk']):
-                    scores_bg = compute_similarity(cur_feature, t_bg_temporal, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
+                if t_bg_temporal.shape[1] > int(cfg['params_water']['topk']):
+                    scores_bg = compute_similarity(cur_feature, t_bg_temporal, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
                 else:
                     scores_bg = torch.zeros(img.shape[2:]).to(device)
 
@@ -322,16 +307,16 @@ def eval_WaterNetNet():
 
                 if not args.no_conf:
                     # Add center features to template features
-                    t_obj_conf, t_bg_conf = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_AA']['r0']))
+                    t_obj_conf, t_bg_conf = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_water']['r0']))
                     # print('Conf features.\t', 'obj:', t_obj_conf.shape, 'bg:', t_bg_conf.shape)
                     
-                    if t_obj_conf.shape[1] > int(cfg['params_AA']['topk']):
-                        scores_obj = compute_similarity(cur_feature, t_obj_conf, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
+                    if t_obj_conf.shape[1] > int(cfg['params_water']['topk']):
+                        scores_obj = compute_similarity(cur_feature, t_obj_conf, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
                     else:
                         scores_obj = torch.zeros(img.shape[2:]).to(device)
 
-                    if t_bg_conf.shape[1] > int(cfg['params_AA']['topk']):
-                        scores_bg = compute_similarity(cur_feature, t_bg_conf, (h,w), img.shape[2:], topk=int(cfg['params_AA']['topk']))
+                    if t_bg_conf.shape[1] > int(cfg['params_water']['topk']):
+                        scores_bg = compute_similarity(cur_feature, t_bg_conf, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
                     else:
                         scores_bg = torch.zeros(img.shape[2:]).to(device)
                     
@@ -343,7 +328,6 @@ def eval_WaterNetNet():
                 else:
                     seg_aa = l0 * seg_first + l1 * seg_temporal
 
-                # seg_aa = torch.where(seg_aa > 0.5, one_tensor, zero_tensor)    
                 seg_final = l_aa * seg_aa + (1 - l_aa) * seg_fcn
             else:
                 seg_final = seg_fcn
@@ -363,17 +347,13 @@ def eval_WaterNetNet():
                     # print('Removed old temporal templates.\t', t_obj_temporal.shape[1], t_bg_temporal.shape[1])
 
                 # Add current features to template features
-                cur_features_obj, cur_features_bg = split_features(feature_map, pre_frame_mask, split_thres=float(cfg['params_AA']['hc']), erosion_iters=int(cfg['params_AA']['r1']))
+                cur_features_obj, cur_features_bg = split_features(feature_map, pre_frame_mask, split_thres=float(cfg['params_water']['hc']), erosion_iters=int(cfg['params_water']['r1']))
                 # print('cur features:\t', 'obj:', cur_features_obj.shape, 'bg:', cur_features_bg.shape)
                 t_obj_temporal = torch.cat((t_obj_temporal, cur_features_obj), dim=1)
                 t_bg_temporal = torch.cat((t_bg_temporal, cur_features_bg), dim=1)
 
                 t_temporal_n.append((cur_features_obj.shape[1], cur_features_bg.shape[1]))
                 # print('temporal features:\t', 'obj:', t_obj_temporal.shape, 'bg:', t_bg_temporal.shape)
-
-            # print('output', output)
-            # print('adapt', adaption_seg)
-            # print('final', seg_final)
 
             running_time.update(time.time() - running_endtime)
             running_endtime = time.time()
@@ -395,10 +375,7 @@ def eval_WaterNetNet():
             if args.verbose:
                 
                 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(10, 6))
-                # for rows in axes:
-                #     for ax in rows:
-                #         ax.set_axis_off()
-
+               
                 seg_first = TF.to_pil_image(seg_first.squeeze(0).cpu())
                 axes[0][0].imshow(seg_first, cmap='gray', interpolation='nearest', vmin=0, vmax=255)
                 axes[0][0].set_title('(a) seg by first frame')
@@ -428,38 +405,6 @@ def eval_WaterNetNet():
                     plt.savefig(os.path.join(out_path, 'v_%d.png' %(i + 1)), bbox_inches='tight', pad_inches = 0)
 
                 plt.close(fig)
-
-            
-            
-
-            # if args.benchmark:
-            #     gt_seg = load_image_in_PIL(os.path.join(gt_folder, gt_list[i])).convert('L')
-            #     gt_seg.thumbnail((int(cfg['params_AA']['eval_h']), int(cfg['params_AA']['eval_w'])), Image.ANTIALIAS)
-            #     gt_tf = TF.to_tensor(gt_seg).to(device).type(torch.int)
-
-            #     iou = iou_tensor(seg_final.squeeze(0).type(torch.int), gt_tf)
-            #     avg_iou += iou.item()
-            #     print('iou:', iou.item())
-
-
-
-    # if args.benchmark:
-    #     print('total_iou:', avg_iou)
-    #     avg_iou /= len(eval_loader)
-    #     print('avg_iou:', avg_iou, 'frame_num:', len(eval_loader))
-        
-        # scores_path = os.path.join(args.out_folder, 'scores.csv')
-        # print(scores_path)
-        # if os.path.exists(scores_path):
-        #     scores_df = pd.read_csv(scores_path)
-        #     scores_df.set_index(['WaterNet', 'WaterNet_no_conf'])
-        # else:
-        #     scores_df = pd.DataFrame({'a':None, 'b':None})
-        # print(scores_df)
-        # scores_df[setting_prefix][args.video_name] = avg_iou
-        # print(scores_df)
-        # scores_df[setting_prefix + '_total'][args.video_name] = len(eval_loader)
-        # scores_df.to_csv(scores_path)
 
     print('\n')
 
