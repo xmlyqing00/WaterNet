@@ -12,7 +12,7 @@ The [dataset](http://t.lyq.me/?d=waternet_water_v2) includes training data and e
 
 ### 1.2 Pretrained model
 
-The [link](http://t.lyq.me/?d=waternet_water_pretrained) to download the pretrained model.
+The [link](http://t.lyq.me/?d=waternet_pretrained) to download the pretrained model.
 
 
 ## 2 Run
