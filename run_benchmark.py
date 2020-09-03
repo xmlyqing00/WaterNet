@@ -1,11 +1,11 @@
 import os
 import argparse
 
-root_folder = '/Ship01/Dataset/water/'
-full_videos = ['stream0', 'stream1', 'stream3_small', 'stream4', 'boston_harbor2_small_rois', 'buffalo0_small', 'canal0', 'mexico_beach_clip0', 'holiday_inn_clip0', 'gulf_crest', 'pineapple_willy_clip0', 'pineapple_willy_clip1']
+root_folder = '/Ship01/Dataset/water_v2/'
+full_videos = ['stream0', 'stream1', 'stream3_small', 'stream2', 'boston_harbor2_small_rois', 'buffalo0_small', 'canal0', 'mexico_beach_clip0', 'holiday_inn_clip0', 'gulf_crest', 'pineapple_willy_clip0', 'pineapple_willy_clip1']
 
 test_videos = full_videos
-list_name = 'eval_addon.txt' # 'eval_all.txt'
+list_name = 'val.txt' # 'eval_all.txt'
 
 def get_sequence_list():
     
@@ -41,7 +41,6 @@ def eval_WaterNet(args):
     if args.no_conf:
         base_cmd += ' --no-conf'
         method_name += '_no_conf'
-    # method_name += '_segs'
 
     if not args.score:
         for seq in sequence_list:
@@ -50,86 +49,15 @@ def eval_WaterNet(args):
                 cmd += ' --sample '
             os.system(cmd)
     
-    get_scores(method_name)
-
-def eval_OSVOS(args):
-    
-    sequence_list = get_sequence_list()
-
-    if args.no_online:
-        
-        if not args.score:
-
-            eval_cmd = 'python3 eval_OSVOSNet.py -c=models/cp_OSVOSNet_199.pth.tar --model-name=OSVOSNet'
-            for seq in sequence_list:
-                cmd = eval_cmd + f' -v {seq}'
-                if seq not in test_videos:
-                    cmd += ' --sample '
-                os.system(cmd)
-        
-        get_scores('OSVOSNet')
-
-    else:
-
-        if not args.score:
-
-            total_epochs = 230
-            train_cmd = f'python3 train_OSVOSNet.py -c=models/cp_OSVOSNet_199.pth.tar --online --total-epochs {total_epochs}'
-            eval_cmd = 'python3 eval_OSVOSNet.py --model-name=OSVOSNet_online'
-
-            for seq in sequence_list:
-                cmd = train_cmd + f' -v{seq}'
-                os.system(cmd)
-
-                cmd = eval_cmd + f' -v {seq}' + f' -c models/cp_OSVOSNet_{total_epochs-1}_{seq}.pth.tar'
-                if seq not in test_videos:
-                    cmd += ' --sample '
-                os.system(cmd)
-
-        get_scores('OSVOSNet_online')
-
-
-def eval_MSK(args):
-
-    sequence_list = get_sequence_list()
-
-    if args.no_online:
-        
-        if not args.score:
-            eval_cmd = 'python3 eval_RGBMaskNet.py -c=models/cp_RGBMaskNet_199.pth.tar --model-name=RGBMaskNet'
-            for seq in sequence_list:
-                cmd = eval_cmd + f' -v {seq}'
-                if seq not in test_videos:
-                    cmd += ' --sample '
-                os.system(cmd)
-        
-        get_scores('RGBMaskNet')
-
-    else:
-        
-        if not args.score:
-
-            train_cmd = 'python3 train_RGBMaskNet.py -c=models/cp_RGBMaskNet_199.pth.tar --online'
-            eval_cmd = 'python3 eval_RGBMaskNet.py --model-name=RGBMaskNet_online'
-
-            for seq in sequence_list:
-                cmd = train_cmd + f' -v{seq}'
-                os.system(cmd)
-
-                cmd = eval_cmd + f' -v {seq}' + f' -c models/cp_RGBMaskNet_229_{seq}.pth.tar'
-                if seq not in test_videos:
-                    cmd += ' --sample '
-                os.system(cmd)
-
-        get_scores('RGBMaskNet_online')
+    # get_scores(method_name)
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Bencharmark')
     parser.add_argument(
-        '--method', default=None, type=str, required=True,
-        help='Input the method name (default: none).')
+        '--method', default='WaterNet', type=str,
+        help='Input the method name (default: WaterNet).')
     parser.add_argument(
         '--score', action='store_true',
         help='Compute the scores without re-run the benchmark.')
@@ -148,8 +76,4 @@ if __name__ == '__main__':
 
     if args.method == 'WaterNet':
         eval_WaterNet(args)
-    elif args.method == 'OSVOS':
-        eval_OSVOS(args)
-    elif args.method == 'MSK':
-        eval_MSK(args)
 

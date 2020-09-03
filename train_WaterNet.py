@@ -24,17 +24,13 @@ def train_WaterNet():
     # Paths
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
-
-    if sys.platform == 'darwin':
-        cfg_dataset = 'dataset_mac'
-    elif sys.platform == 'linux':
-        cfg_dataset = 'dataset_ubuntu'
+    cfg_dataset = 'dataset_ubuntu'
 
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch WaterNet Training')
     parser.add_argument(
         '--total-epochs', default=int(cfg['params_water']['total_epochs']), type=int, metavar='N',
-        help='Number of total epochs to run (default 100).')
+        help='Number of total epochs to run (default 200).')
     parser.add_argument(
         '--lr', default=float(cfg['params_water']['lr']), type=float, metavar='LR', 
         help='Initial learning rate.')

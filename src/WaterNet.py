@@ -5,7 +5,28 @@ from torch import nn
 from torch.autograd import Variable
 from torchvision.models.resnet import BasicBlock
 
-from src.network import FCNBase
+
+class FCNBase(nn.Module):
+
+    def __init__(self):
+        super(FCNBase, self).__init__()
+    
+    @staticmethod
+    def align_shape(x, desired_shape):
+        left = int((x.shape[2] - desired_shape[2]) / 2)
+        top = int((x.shape[3] - desired_shape[3]) / 2)
+        x = x[:,:,left:left+desired_shape[2],top:top+desired_shape[3]]
+        return x
+    
+    def load_pretrained_model(self, pretrained_model):
+        own_state = self.state_dict()
+        for name, param in pretrained_model.items():
+            if name in own_state:
+                own_state[name].copy_(param.data)
+
+    def forward(self, x):
+        raise NotImplementedError
+        
 
 
 class FeatureNet(FCNBase):
@@ -122,9 +143,6 @@ class DeconvNet(FCNBase):
         # print(x.shape)
 
         x = self.fuse1(x)
-        # x = self.bn(x)
-        # x = self.relu(x)
-        # x = self.fuse2(x)
         x = self.sigmoid(x)
 
         return x
@@ -133,16 +151,6 @@ class DeconvNet(FCNBase):
     def make_deconv_layer(in_planes, out_planes, merge_flag=False, stride=2):
 
         layers = []
-        # if merge_flag:
-        #    layers.append(
-        #        nn.Conv2d(in_planes, in_planes, kernel_size=3, stride=1, padding=1)
-        #    )
-        #    layers.append(nn.BatchNorm2d(in_planes))
-        #    layers.append(nn.ReLU(inplace=True))
-        # if stride == 4:
-        #    layers.append(
-        #        nn.ConvTranspose2d(in_planes, in_planes, padding=1, output_padding=1, kernel_size=3, stride=2)
-        #    )
 
         layers.append(
             nn.ConvTranspose2d(in_planes, out_planes, padding=1, output_padding=1, kernel_size=3, stride=2)

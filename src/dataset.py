@@ -34,12 +34,12 @@ class WaterDataset(data.Dataset):
             print('Initialize offline training dataset:')
 
             for sub_folder in water_subdirs:
-                img_path = os.path.join(dataset_path, 'training_imgs/', sub_folder)
+                img_path = os.path.join(dataset_path, 'JPEGImages/', sub_folder)
                 img_list = os.listdir(img_path)
                 img_list.sort(key=lambda x: (len(x), x))
                 self.img_list += [os.path.join(img_path, name) for name in img_list]
 
-                label_path = os.path.join(dataset_path, 'training_labels/', sub_folder)
+                label_path = os.path.join(dataset_path, 'Annotations/', sub_folder)
                 label_list = os.listdir(label_path)
                 label_list.sort(key=lambda x: (len(x), x))
                 self.label_list += [os.path.join(label_path, name) for name in label_list]
@@ -50,12 +50,12 @@ class WaterDataset(data.Dataset):
             if test_case is None:
                 raise ('test_case can not be None.')
 
-            img_path = os.path.join(dataset_path, 'test_videos/', test_case)
+            img_path = os.path.join(dataset_path, 'JPEGImages/', test_case)
             img_list = os.listdir(img_path)
             img_list.sort(key=lambda x: (len(x), x))
 
-            first_frame_path = os.path.join(dataset_path, 'test_videos/', test_case, img_list[0])
-            first_frame_label_path = os.path.join(dataset_path, 'test_annots/', test_case, img_list[0])
+            first_frame_path = os.path.join(dataset_path, 'JPEGImages/', test_case, img_list[0])
+            first_frame_label_path = os.path.join(dataset_path, 'Annotations/', test_case, img_list[0])
 
             # Detect label image format: png or jpg
             first_frame_label_path = first_frame_label_path[:-3]
@@ -78,12 +78,12 @@ class WaterDataset(data.Dataset):
             if test_case is None:
                 raise ('test_case can not be None.')
 
-            img_path = os.path.join(dataset_path, 'test_videos/', test_case)
+            img_path = os.path.join(dataset_path, 'JPEGImages/', test_case)
             img_list = os.listdir(img_path)
             img_list.sort(key=lambda x: (len(x), x))
             self.img_list = [os.path.join(img_path, name) for name in img_list]
 
-            first_frame_label_path = os.path.join(dataset_path, 'test_annots/', test_case, img_list[0])
+            first_frame_label_path = os.path.join(dataset_path, 'Annotations/', test_case, img_list[0])
 
             # Detect label image format: png or jpg
             first_frame_label_path = first_frame_label_path[:-3]
@@ -93,7 +93,7 @@ class WaterDataset(data.Dataset):
                 first_frame_label_path += 'jpg'
 
             if not os.path.exists(first_frame_label_path):
-                label_list = glob(os.path.join(dataset_path, 'test_annots/', test_case, '*.png'))
+                label_list = glob(os.path.join(dataset_path, 'Annotations/', test_case, '*.png'))
                 label_list.sort(key=lambda x: (x, len(x)))
                 first_frame_label_path = label_list[0]
 
@@ -181,136 +181,6 @@ class WaterDataset_RGB(WaterDataset):
 
             sample = {
                 'img': img,
-                'label': label
-            }
-        else:
-            sample = {
-                'img': img
-            }
-
-        return sample
-
-
-class WaterDataset_online(data.Dataset):
-
-    def __init__(self, video_name, input_size=None):
-        super(WaterDataset_online, self).__init__()
-
-        self.video_name = video_name
-        self.annot_dir = os.path.join('/Ship01/Dataset/water/test_annots/', video_name)
-        self.img_dir = os.path.join('/Ship01/Dataset/water/test_videos/', video_name)
-
-        self.label_list = glob(os.path.join(self.annot_dir, '*.png'))
-        self.img_list = [os.path.join(self.img_dir, os.path.basename(x).replace('.png', '.jpg')) for x in self.label_list]
-        self.input_size = input_size
-        self.online_augmentation_per_epoch = 480
-        self.verbose_flag = False
-
-    def __len__(self):
-        return len(self.img_list)
-
-    def __getitem__(self, index):
-        img = load_image_in_PIL(self.img_list[index]).convert('RGB')
-        label = load_image_in_PIL(self.label_list[index]).convert('L')
-
-        sample = self.apply_transforms(img, label)
-
-        return sample
-
-    def apply_transforms(self, img, label=None):
-        img = my_tf.random_adjust_color(img, self.verbose_flag)
-        img, label = my_tf.random_affine_transformation(img, None, label, self.verbose_flag)
-        img, label = my_tf.random_resized_crop(img, None, label, self.input_size, self.verbose_flag)
-
-        img = TF.to_tensor(img)
-        img = my_tf.imagenet_normalization(img)
-
-        label = TF.to_tensor(label)
-
-        # if (img.shape[0] != 3):
-        # print('img', img.shape)
-        # print('mask', mask.shape)
-        # print('label', label.shape)
-
-        sample = {
-            'img': img,
-            'label': label
-        }
-
-        return sample
-
-
-class WaterDataset_RGBMask(WaterDataset):
-
-    def __init__(self, mode, dataset_path, input_size=None, test_case=None, eval_size=None):
-
-        super(WaterDataset_RGBMask, self).__init__(mode, dataset_path, input_size, test_case, eval_size)
-
-    def __getitem__(self, index):
-
-        if self.mode == 'train_offline':
-            img = load_image_in_PIL(self.img_list[index]).convert('RGB')
-            label = load_image_in_PIL(self.label_list[index]).convert('L')
-
-            sample = self.apply_transforms(img, label, label)
-            return sample
-
-        elif self.mode == 'train_online':
-            sample = self.apply_transforms(self.first_frame, self.first_frame_label, self.first_frame_label)
-            return sample
-
-        elif self.mode == 'eval':
-            img = load_image_in_PIL(self.img_list[index]).convert('RGB')
-            if self.eval_size:
-                img = img.resize(self.eval_size, Image.ANTIALIAS)
-            sample = self.apply_transforms(img)
-            return sample
-
-    def apply_transforms(self, img, mask=None, label=None):
-
-        if self.mode == 'train_offline' or self.mode == 'train_online':
-
-            # img.save('tmp/ori_img.png')
-            # mask.save('tmp/ori_mask.png')
-            # label.save('tmp/ori_label.png')
-
-            img = my_tf.random_adjust_color(img, self.verbose_flag)
-            # img.save('tmp/color_img.png')
-
-            img, mask, label = my_tf.random_affine_transformation(img, mask, label, self.verbose_flag)
-
-            # img.save('tmp/affine_img.png')
-            # mask.save('tmp/affine_mask.png')
-            # label.save('tmp/affine_label.png')
-
-            mask = my_tf.random_mask_perturbation(mask, self.verbose_flag)
-
-            # mask.save('tmp/pertur_mask.png')
-            img, mask, label = my_tf.random_resized_crop(img, mask, label, self.input_size, self.verbose_flag)
-
-            # img.save('tmp/crop_img.png')
-            # mask.save('tmp/crop_mask.png')
-            # label.save('tmp/crop_label.png')
-
-        elif self.mode == 'eval':
-            pass
-
-        img = TF.to_tensor(img)
-        img = my_tf.imagenet_normalization(img)
-
-        if self.mode == 'train_offline' or self.mode == 'train_online':
-
-            mask = TF.to_tensor(mask)
-            label = TF.to_tensor(label)
-
-            # if (img.shape[0] != 3):
-            # print('img', img.shape)
-            # print('mask', mask.shape)
-            # print('label', label.shape)
-
-            sample = {
-                'img': img,
-                'mask': mask,
                 'label': label
             }
         else:

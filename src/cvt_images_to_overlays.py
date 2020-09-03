@@ -89,7 +89,7 @@ def cvt_images_to_overlays(image_folder,
 
 def run_cvt_images_to_overlays(video_name, mask_folder, root_folder, model_name='RGBMaskNet', eval_size=None):
 
-    image_folder = os.path.join(root_folder, 'test_videos/', video_name)
+    image_folder = os.path.join(root_folder, 'JPEGImages/', video_name)
     mask_folder = os.path.join(root_folder, 'results', model_name + '_segs', mask_folder)
     output_folder = os.path.join(root_folder, 'results', model_name + '_overlays', video_name)
     label_color = (255, 255, 255)
@@ -99,22 +99,22 @@ def run_cvt_images_to_overlays(video_name, mask_folder, root_folder, model_name=
     # eval_size: (h, w)
     cvt_images_to_overlays(image_folder, mask_folder, output_folder, label_color, stride, frame_st, eval_size)
 
-def run_add_mask_to_image(root_folder, video_name, model_name):
+# def run_add_mask_to_image(root_folder, video_name, model_name):
 
-    img_name = 'Holiday_Inn_09-10-2018-17-29-52_0.png'
-    image = cv2.imread(os.path.join(root_folder, 'test_videos',  video_name, img_name))
-    mask = cv2.imread(os.path.join(root_folder, 'results', model_name + '_segs', video_name, '00002.png'))
-    origin_shape = image.shape
-    if mask.shape != image.shape:
-        image = cv2.resize(image, (mask.shape[1], mask.shape[0]), None)
-    image_mask = add_mask_to_image(image, mask, [255, 255, 255])
-    if image_mask.shape != origin_shape:
-        image_mask = cv2.resize(image_mask, (origin_shape[1], origin_shape[0]), None)
+#     img_name = 'Holiday_Inn_09-10-2018-17-29-52_0.png'
+#     image = cv2.imread(os.path.join(root_folder, 'JPEGImages',  video_name, img_name))
+#     mask = cv2.imread(os.path.join(root_folder, 'results', model_name + '_segs', video_name, '00002.png'))
+#     origin_shape = image.shape
+#     if mask.shape != image.shape:
+#         image = cv2.resize(image, (mask.shape[1], mask.shape[0]), None)
+#     image_mask = add_mask_to_image(image, mask, [255, 255, 255])
+#     if image_mask.shape != origin_shape:
+#         image_mask = cv2.resize(image_mask, (origin_shape[1], origin_shape[0]), None)
 
-    out_folder = os.path.join(root_folder,  'results', model_name + '_overlays', video_name)
-    if not os.path.exists(out_folder):
-        os.makedirs(out_folder)
-    cv2.imwrite(os.path.join(out_folder, img_name[:-4] + '_mask.png'), image_mask)
+#     out_folder = os.path.join(root_folder,  'results', model_name + '_overlays', video_name)
+#     if not os.path.exists(out_folder):
+#         os.makedirs(out_folder)
+#     cv2.imwrite(os.path.join(out_folder, img_name[:-4] + '_mask.png'), image_mask)
 
 if __name__ == '__main__':
     

@@ -18,7 +18,7 @@ from src.WaterNet import FeatureNet, DeconvNet
 from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
-from src.utils import load_image_in_PIL, iou_tensor
+from src.utils import load_image_in_PIL
 
 device = torch.device('cpu')
 if torch.cuda.is_available():
@@ -28,7 +28,7 @@ one_tensor = torch.ones(1).to(device)
 zero_tensor = torch.zeros(1).to(device)
 
 # Hyper parameters
-erosion_bg_factor = 1.3
+erosion_bg_factor = 1.3  # 1.3
 
 def split_mask(mask, split_thres, erosion_iters):
 
@@ -76,7 +76,6 @@ def split_features(feature_map, mask, split_thres=0.5, erosion_iters=0):
 def compute_similarity(cur_feature, feature_templates, shape_s, shape_l, topk=20):
 
     similarity_scores = cur_feature.matmul(feature_templates) # Size: (h*w, m0)
-    # print(similarity_scores.max(), similarity_scores.min())
     topk_scores = similarity_scores.topk(k=topk, dim=1, largest=True)
     avg_scores = topk_scores.values.mean(dim=1).reshape(1, 1, shape_s[0], shape_s[1])
     scores = F.interpolate(avg_scores, shape_l, mode='bilinear', align_corners=False)
@@ -100,11 +99,7 @@ def eval_WaterNetNet():
     # Paths
     cfg = configparser.ConfigParser()
     cfg.read('settings.conf')
-
-    if sys.platform == 'darwin':
-        cfg_dataset = 'dataset_mac'
-    elif sys.platform == 'linux':
-        cfg_dataset = 'dataset_ubuntu'
+    cfg_dataset = 'dataset_ubuntu'
 
     # Hyper parameters
     parser = argparse.ArgumentParser(description='PyTorch WaterNet Testing')
@@ -146,7 +141,7 @@ def eval_WaterNetNet():
     
     # Hyper parameters 2
     water_thres = 0.5
-    l0, l1, l2 = 0.4, 0.2, 0.4
+    l0, l1, l2 = 0.5, 0.3, 0.2
     if args.no_conf:
         l0, l1, l2 = 0.67, 0.33, 0
     l_aa = 0.5
@@ -228,9 +223,10 @@ def eval_WaterNetNet():
     first_frame = dataset.get_first_frame().to(device).unsqueeze(0)
     eval_size = first_frame.shape[-2:]
     f3, f0, f1, f2 = feature_net(first_frame)
-    f2 = F.interpolate(f2, size=f1.shape[-2:], mode='bilinear', align_corners=False)
-    f3 = F.interpolate(f3, size=f1.shape[-2:], mode='bilinear', align_corners=False)
-    feature0 = torch.cat((f1, f2, f3), 1)
+    # f2 = F.interpolate(f2, size=f1.shape[-2:], mode='bilinear', align_corners=False)
+    f3 = F.interpolate(f3, size=f2.shape[-2:], mode='bilinear', align_corners=False)
+    feature0 = torch.cat((f2, f3), 1)
+    # feature0 = f3
 
     # Normalize features. Size: (c, h, w)
     feature_map = feature0.detach().squeeze(0)
@@ -252,7 +248,6 @@ def eval_WaterNetNet():
     keep_features_n = int(cfg['params_water']['temporal_n'])
 
     print('Erosion params.\t', 'Conf:', int(cfg['params_water']['r0']), 'Temporal:', int(cfg['params_water']['r1']))
-    print('\n')
 
     with torch.no_grad():
         for i, sample in enumerate(tqdm(eval_loader)):
@@ -262,9 +257,10 @@ def eval_WaterNetNet():
             f3, f0, f1, f2 = feature_net(img)
             seg_fcn = deconv_net(f3, f0, f1, f2, img.shape).detach() # Size: (1, 1, h, w)
 
-            f2 = F.interpolate(f2, size=f1.shape[-2:], mode='bilinear', align_corners=False)
-            f3 = F.interpolate(f3, size=f1.shape[-2:], mode='bilinear', align_corners=False)
-            feature_map = torch.cat((f1, f2, f3), 1)
+            # f2 = F.interpolate(f2, size=f1.shape[-2:], mode='bilinear', align_corners=False)
+            f3 = F.interpolate(f3, size=f2.shape[-2:], mode='bilinear', align_corners=False)
+            feature_map = torch.cat((f2, f3), 1)
+            # feature_map = f3
 
             l0, l1, l2 = adjust_rates(i + 1, l0, l1, l2)
             # print(i, l0, l1, l2)
@@ -278,9 +274,7 @@ def eval_WaterNetNet():
                 # Seg first frame features
                 scores_obj = compute_similarity(cur_feature, t_obj_first, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
                 scores_bg = compute_similarity(cur_feature, t_bg_first, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
-                seg_first = ((scores_obj - scores_bg + 2) / 4).squeeze(1)
-                val_min = seg_first.min()
-                seg_first = (seg_first - val_min) / (seg_first.max() - val_min)
+                seg_first = ((scores_obj - scores_bg + 1) / 2).squeeze(1)
 
                 # Seg temporal features 
                 if t_obj_temporal.shape[1] > int(cfg['params_water']['topk']):
@@ -301,14 +295,11 @@ def eval_WaterNetNet():
                 #     tmp_img = TF.to_pil_image(scores_bg.squeeze(0).cpu())
                 #     tmp_img.save(f'tmp/bg_{i}.png')
 
-                seg_temporal = ((scores_obj - scores_bg + 2) / 4).squeeze(1)
-                val_min = seg_temporal.min()
-                seg_temporal = (seg_temporal - val_min) / (seg_temporal.max() - val_min)
+                seg_temporal = ((scores_obj - scores_bg + 1) / 2).squeeze(1)
 
                 if not args.no_conf:
                     # Add center features to template features
-                    t_obj_conf, t_bg_conf = split_features(feature_map, pre_frame_mask, erosion_iters=int(cfg['params_water']['r0']))
-                    # print('Conf features.\t', 'obj:', t_obj_conf.shape, 'bg:', t_bg_conf.shape)
+                    t_obj_conf, t_bg_conf = split_features(feature_map, pre_frame_mask, split_thres=float(cfg['params_water']['hc']), erosion_iters=int(cfg['params_water']['r0']))
                     
                     if t_obj_conf.shape[1] > int(cfg['params_water']['topk']):
                         scores_obj = compute_similarity(cur_feature, t_obj_conf, (h,w), img.shape[2:], topk=int(cfg['params_water']['topk']))
@@ -320,20 +311,20 @@ def eval_WaterNetNet():
                     else:
                         scores_bg = torch.zeros(img.shape[2:]).to(device)
                     
-                    seg_conf = ((scores_obj - scores_bg + 2) / 4).squeeze(1)
-                    val_min = seg_conf.min()
-                    seg_conf = (seg_conf - val_min) / (seg_conf.max() - val_min)
+                    seg_conf = ((scores_obj - scores_bg + 1) / 2).squeeze(1)
 
                     seg_aa = l0 * seg_first + l1 * seg_temporal + l2 * seg_conf
                 else:
                     seg_aa = l0 * seg_first + l1 * seg_temporal
+
+                seg_aa = torch.where(seg_aa > water_thres, one_tensor, zero_tensor)  # Size: (1, 1, h, w)
 
                 seg_final = l_aa * seg_aa + (1 - l_aa) * seg_fcn
             else:
                 seg_final = seg_fcn
             
 
-            seg_final = torch.where(seg_final > 0.5, one_tensor, zero_tensor) # Size: (1, 1, h, w)
+            seg_final = torch.where(seg_final > water_thres, one_tensor, zero_tensor) # Size: (1, 1, h, w)
             pre_frame_mask = F.interpolate(seg_final, size=(h, w), mode='bilinear', align_corners=False).detach()
             
             if not args.no_aa:
@@ -343,7 +334,6 @@ def eval_WaterNetNet():
                     j = i - keep_features_n
                     t_obj_temporal = t_obj_temporal[:,t_temporal_n[j][0]:]
                     t_bg_temporal = t_bg_temporal[:,t_temporal_n[j][1]:]
-
                     # print('Removed old temporal templates.\t', t_obj_temporal.shape[1], t_bg_temporal.shape[1])
 
                 # Add current features to template features
@@ -405,8 +395,6 @@ def eval_WaterNetNet():
                     plt.savefig(os.path.join(out_path, 'v_%d.png' %(i + 1)), bbox_inches='tight', pad_inches = 0)
 
                 plt.close(fig)
-
-    print('\n')
 
     if args.sample:
         mask_folder = args.video_name + '_full'
