@@ -1,6 +1,7 @@
 # WaterNetV1
 
 This is an official implementation for the paper "WaterNet: An adaptive matching pipeline for segmenting water with volatile appearance"  Computational Visual Media, 2020: 1-14.
+[Paper](https://link.springer.com/content/pdf/10.1007/s41095-020-0156-x.pdf) is open access.
 
 ![](assets/pipeline.png)
 
