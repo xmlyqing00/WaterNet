@@ -54,7 +54,7 @@ In `eval_WaterNet.py`, `l0, l1, l2 = 0.5, 0.3, 0.2`.
 python3 train_WaterNet.py
 ```
 
-## 4
+## 4 Citations
 If you use our codes or dataset in your research, please cite our paper.
 ```bibtex
 @article{liang2020waternet,
