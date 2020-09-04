@@ -1,8 +1,4 @@
-import numpy as np
-from copy import deepcopy
-import torch
 from torch import nn
-from torch.autograd import Variable
 from torchvision.models.resnet import BasicBlock
 
 

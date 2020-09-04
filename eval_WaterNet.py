@@ -1,24 +1,19 @@
 import os
 import argparse
-import sys
 import time
 import configparser
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-import cv2
 import torch
 from tqdm import tqdm
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
-from PIL import Image
 from scipy import ndimage
 
 from src.WaterNet import FeatureNet, DeconvNet
 from src.dataset import WaterDataset_RGB
 from src.avg_meter import AverageMeter
 from src.cvt_images_to_overlays import run_cvt_images_to_overlays
-from src.utils import load_image_in_PIL
 
 device = torch.device('cpu')
 if torch.cuda.is_available():

@@ -14,12 +14,22 @@ Download the WaterDataset from [Kaggle](https://www.kaggle.com/gvclsu/water-segm
 It includes training data and evaluation data.
 ![](assets/dataset.png)
 
-### 1.2 Pretrained model
+In the `settings.conf`, update the 3rd line `dataset_ubuntu` as the path to the dataset.
+
+### 1.2 Dependant packages
+
+This repository is developed and tested on Ubuntu 18.04, Python 3.6.9 and PyTorch 1.4.0.
+More dependant packages are listed in `requirements.txt`. 
+We recommend you create a Python virtual environment to install them by
+```bash
+pip3 install -r requirements.txt
+``` 
+
+### 1.3 Pretrained model
 
 The [link](http://t.lyq.me/?d=waternet_pretrained) to download the pretrained model.
 
-### 1.3 Setup path
-In the `settings.conf`, update the 3rd line `dataset_ubuntu` as the path to the dataset.
+
 
 ## 2 Evaluation
 

@@ -1,6 +1,5 @@
 import os
 import argparse
-import sys
 import time
 import configparser
 import torch
