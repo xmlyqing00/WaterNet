@@ -3,6 +3,7 @@ from glob import glob
 import torchvision.transforms.functional as TF
 from PIL import Image
 from torch.utils import data
+import numpy as np
 
 from src.utils import load_image_in_PIL
 import src.transforms as my_tf
@@ -24,7 +25,10 @@ class WaterDataset(data.Dataset):
         self.eval_size = eval_size
 
         if mode == 'train_offline':
-            water_subdirs = ['ADE20K', 'river_segs']
+
+            with open(os.path.join(dataset_path, 'train_imgs.txt'), 'r') as f:
+                water_subdirs = f.readlines()
+            water_subdirs = [x.strip() for x in water_subdirs]
 
             print('Initialize offline training dataset:')
 
@@ -101,6 +105,8 @@ class WaterDataset(data.Dataset):
                 self.origin_size = self.first_frame.size
                 self.first_frame = self.first_frame.resize(self.eval_size, Image.ANTIALIAS)
                 self.first_frame_label = self.first_frame_label.resize(self.eval_size, Image.ANTIALIAS)
+
+            self.first_frame_label = (np.array(self.first_frame_label) > 0).astype(np.float32)
 
         else:
             raise ('Mode %s does not support in [train_offline, train_online, eval].' % mode)

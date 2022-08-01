@@ -5,6 +5,7 @@ nohup.out
 .idea/
 __pycache__/
 
+models/
 data/
 features/
 tmp/
