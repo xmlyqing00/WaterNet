@@ -28,7 +28,7 @@ pip3 install -r requirements.txt
 
 ### 1.3 Pretrained model
 
-The [link](http://t.lyq.me/?d=waternet_pretrained) to download the pretrained model.
+The [link](https://drive.google.com/file/d/12ACu6UOpMLmaK8di8rtaUt4YxTDGtCF3/view?usp=share_link) to download the pretrained model.
 
 
 
